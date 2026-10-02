@@ -1,3 +1,4 @@
+import { connectMongoDB } from './src/server/mongodb';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -52,25 +53,25 @@ const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
 // ==========================================
 
 // --- Auth Routes ---
-app.post('/api/auth/register', (req: Request, res: Response) => {
+app.post('/api/auth/register', async (req: Request, res: Response) => {
   const { name, email, phone, password } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
 
-  const existing = db.findUserByEmail(email);
+  const existing = await db.findUserByEmail(email);
   if (existing) {
     return res.status(409).json({ error: 'Account with this email already exists' });
   }
 
-  const newUser = db.createUser({
-    id: `usr-${Date.now()}`,
-    name,
-    email,
-    phone: phone || '',
-    role: 'customer',
-    createdAt: new Date().toISOString(),
-  });
+const newUser = await db.createUser({
+  id: `usr-${Date.now()}`,
+  name,
+  email,
+  phone: phone || '',
+  role: 'customer',
+  createdAt: new Date().toISOString(),
+});
 
   const token = jwt.sign(
     { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
@@ -81,7 +82,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   res.status(201).json({ user: newUser, token });
 });
 
-app.post('/api/auth/login', (req: Request, res: Response) => {
+app.post('/api/auth/login', async (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -89,7 +90,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   // Admin credentials check
   if (email.toLowerCase() === 'admin@vivepanya.com') {
-    if (db.verifyAdminPassword(password) || password === 'admin123') {
+    if (await db.verifyAdminPassword(password))  {
       const token = jwt.sign(
         { id: 'usr-admin', email: 'admin@vivepanya.com', name: 'VIVE Admin', role: 'admin' },
         JWT_SECRET,
@@ -110,7 +111,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     }
   }
 
-  const user = db.findUserByEmail(email);
+  const user = await db.findUserByEmail(email);
   if (!user) {
     return res.status(404).json({ error: 'User account not found' });
   }
@@ -130,8 +131,8 @@ app.get('/api/auth/me', authenticateToken, (req: AuthRequest, res: Response) => 
 });
 
 // --- Products Routes ---
-app.get('/api/products', (req: Request, res: Response) => {
-  let products = db.getProducts();
+app.get('/api/products', async (req: Request, res: Response) => {
+  let products = await db.getProducts();
   const { search, category, minPrice, maxPrice, minRating, sort } = req.query;
 
   if (search && typeof search === 'string') {
@@ -188,11 +189,13 @@ app.get('/api/products', (req: Request, res: Response) => {
   res.json(products);
 });
 
-app.get('/api/products/:id', (req: Request, res: Response) => {
-  const product = db.getProductById(req.params.id);
+app.get('/api/products/:id', async (req: Request, res: Response) => {
+  const product = await db.getProductById(req.params.id);
+
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
   }
+
   res.json(product);
 });
 
@@ -248,8 +251,9 @@ app.delete('/api/products/:id', requireAdmin, (req: Request, res: Response) => {
 });
 
 // --- Categories ---
-app.get('/api/categories', (_req: Request, res: Response) => {
-  res.json(db.getCategories());
+app.get('/api/categories', async (_req: Request, res: Response) => {
+  const categories = await db.getCategories();
+  res.json(categories);
 });
 
 app.post('/api/categories', requireAdmin, (req: Request, res: Response) => {
@@ -387,9 +391,9 @@ app.get('/api/admin/stats', requireAdmin, (_req: Request, res: Response) => {
   res.json(db.getStats());
 });
 
-app.get('/api/admin/customers', requireAdmin, (_req: Request, res: Response) => {
-  const users = db.getUsers().filter(u => u.role === 'customer');
-  const orders = db.getOrders();
+app.get('/api/admin/customers', async (req: Request, res: Response) => {
+ const users = (await db.getUsers()).filter(u => u.role === 'customer');
+  const orders = await db.getOrders();
 
   const customerList = users.map(user => {
     const userOrders = orders.filter(o => o.customer.email.toLowerCase() === user.email.toLowerCase());
@@ -431,4 +435,9 @@ async function startServer() {
   });
 }
 
-startServer();
+connectMongoDB()
+  .then(() => startServer())
+  .catch((error) => {
+    console.error('❌ MongoDB connection failed:', error);
+    process.exit(1);
+  });

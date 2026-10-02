@@ -1,0 +1,598 @@
+{
+  "users": [
+    {
+      "id": "usr-admin",
+      "name": "VIVE Admin",
+      "email": "admin@vivepanya.com",
+      "phone": "+91 98765 43210",
+      "role": "admin",
+      "createdAt": "2026-10-01T05:30:32.552Z"
+    },
+    {
+      "id": "usr-customer",
+      "name": "Priya Sundaram",
+      "email": "customer@vivepanya.com",
+      "phone": "+91 98450 12345",
+      "role": "customer",
+      "createdAt": "2026-10-01T05:30:32.553Z"
+    },
+    {
+      "id": "usr-1790834106949",
+      "name": "sachin",
+      "email": "sachin@gmail.com",
+      "phone": "656565646",
+      "role": "customer",
+      "createdAt": "2026-10-01T05:55:06.949Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "prod-1",
+      "name": "Neem & Tulsi Herbal Purifying Soap",
+      "slug": "neem-tulsi-purifying-soap",
+      "category": "Handmade Soaps",
+      "price": 180,
+      "discountPrice": 149,
+      "description": "A traditional Ayurvedic recipe crafted with pure neem extract, crushed organic tulsi leaves, and cold-pressed coconut oil. Gently purifies the skin while retaining natural moisture.",
+      "benefits": [
+        "Natural antibacterial and antifungal properties",
+        "Helps prevent breakouts and soothes irritation",
+        "Rich moisturizing lather without harsh sulfates",
+        "Suitable for all skin types, including sensitive skin"
+      ],
+      "ingredients": [
+        "Cold-Pressed Virgin Coconut Oil",
+        "Neem Seed Extract",
+        "Organic Tulsi Leaf Powder",
+        "Castor Oil",
+        "Glycerin",
+        "Pure Essential Oil Blend"
+      ],
+      "usage": "Lather between hands with warm water. Gently massage over damp body and face. Rinse thoroughly.",
+      "stock": 44,
+      "images": [
+        "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg",
+        "/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
+      ],
+      "rating": 4.8,
+      "reviewCount": 38,
+      "isFeatured": true,
+      "isBestSeller": true,
+      "isNewArrival": false,
+      "weight": "125g",
+      "createdAt": "2026-01-15T10:00:00Z"
+    },
+    {
+      "id": "prod-2",
+      "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+      "slug": "virgin-coconut-oil-500ml",
+      "category": "Virgin Coconut Oil",
+      "price": 399,
+      "discountPrice": 349,
+      "description": "Extracted from fresh, mature coconut milk through traditional cold centrifugation. Preserves vital lauric acid, antioxidants, and a delicate natural aroma without heat or chemicals.",
+      "benefits": [
+        "100% Raw, Unrefined, and Nutrient-rich",
+        "Deep hair conditioning and scalp nourishment",
+        "Intensive skin moisturizer and massage oil",
+        "Multi-purpose wellness staple"
+      ],
+      "ingredients": [
+        "100% Pure Cold-Pressed Virgin Coconut Oil (Cocos nucifera)"
+      ],
+      "usage": "Warm a few drops between palms and gently apply to hair, scalp, or skin. Can be used daily.",
+      "stock": 57,
+      "images": [
+        "/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg",
+        "/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
+      ],
+      "rating": 4.9,
+      "reviewCount": 64,
+      "isFeatured": true,
+      "isBestSeller": true,
+      "isNewArrival": false,
+      "weight": "500ml",
+      "createdAt": "2026-01-18T12:00:00Z"
+    },
+    {
+      "id": "prod-3",
+      "name": "Artisanal Festival Gift Box Collection",
+      "slug": "festival-gift-box-collection",
+      "category": "Combos & Gift Packs",
+      "price": 899,
+      "discountPrice": 749,
+      "description": "A curated luxury gift set featuring four handmade herbal bars, a 100ml miniature virgin coconut oil bottle, and a handcrafted wooden soap rest, presented in a reusable eco-luxury box.",
+      "benefits": [
+        "Delightful assortment of signature fragrances",
+        "Eco-friendly biodegradable gift packaging",
+        "Ideal for family celebrations, Diwali, and corporate gifting"
+      ],
+      "ingredients": [
+        "Sandalwood Bar (100g)",
+        "Neem & Tulsi Bar (100g)",
+        "Coffee Scrub Bar (100g)",
+        "Goat Milk & Honey Bar (100g)",
+        "Virgin Coconut Oil (100ml)"
+      ],
+      "usage": "Perfect personal gifting collection for loved ones.",
+      "stock": 25,
+      "images": [
+        "/src/assets/images/product_gift_festival_box_1790230452588.jpg",
+        "/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
+      ],
+      "rating": 5,
+      "reviewCount": 19,
+      "isFeatured": true,
+      "isBestSeller": false,
+      "isNewArrival": true,
+      "weight": "650g",
+      "createdAt": "2026-02-01T09:30:00Z"
+    },
+    {
+      "id": "prod-5",
+      "name": "Turmeric & Saffron Pigmentation Care Soap",
+      "slug": "turmeric-saffron-pigmentation-soap",
+      "category": "Special Care & Detox",
+      "price": 220,
+      "discountPrice": 185,
+      "description": "Infused with golden wild turmeric (Kasturi Manjal) and Kashmiri saffron threads. Formulated to reduce the look of sun spots, uneven tone, and dullness for a natural radiant glow.",
+      "benefits": [
+        "Imparts natural luminosity and clarity",
+        "Aids in evening out hyperpigmentation and sun tan",
+        "Enriched with antioxidant saffron stigmas"
+      ],
+      "ingredients": [
+        "Kashmiri Saffron Extract",
+        "Wild Turmeric Rhizome Extract",
+        "Cold-Pressed Almond Oil",
+        "Saponified Virgin Coconut Oil"
+      ],
+      "usage": "Massage into lather on damp face and neck. Leave for 30 seconds before rinsing.",
+      "stock": 40,
+      "images": [
+        "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+      ],
+      "rating": 4.8,
+      "reviewCount": 42,
+      "isFeatured": true,
+      "isBestSeller": true,
+      "isNewArrival": false,
+      "weight": "125g",
+      "createdAt": "2026-01-25T11:00:00Z"
+    },
+    {
+      "id": "prod-7",
+      "name": "Pure Mysore Sandalwood Radiance Soap",
+      "slug": "mysore-sandalwood-radiance-soap",
+      "category": "Handmade Soaps",
+      "price": 240,
+      "discountPrice": 199,
+      "description": "Distilled with pure aromatic Mysore sandalwood oil and warm botanical notes. Leaves skin soft, supple, and delicately perfumed with classic timeless elegance.",
+      "benefits": [
+        "Authentic sandalwood calming aroma",
+        "Enhances natural skin softness and texture",
+        "Gentle luxury lather for everyday pampering"
+      ],
+      "ingredients": [
+        "Mysore Sandalwood Essential Oil",
+        "Virgin Coconut Oil",
+        "Cocoa Butter",
+        "Castor Seed Oil"
+      ],
+      "usage": "Work into a silky lather and inhale the calming aroma while cleansing.",
+      "stock": 18,
+      "images": [
+        "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+      ],
+      "rating": 4.9,
+      "reviewCount": 51,
+      "isFeatured": true,
+      "isBestSeller": true,
+      "isNewArrival": false,
+      "weight": "125g",
+      "createdAt": "2026-01-10T08:00:00Z"
+    },
+    {
+      "id": "prod-4",
+      "name": "Activated Charcoal & Tea Tree Detox Soap",
+      "slug": "charcoal-tea-tree-detox-soap",
+      "category": "Special Care & Detox",
+      "price": 195,
+      "discountPrice": 165,
+      "description": "Specially formulated with bamboo activated charcoal to draw out deep-seated impurities, environmental pollutants, and excess sebum. Infused with Australian tea tree oil for a crisp, clarified feel.",
+      "benefits": [
+        "Deep pore cleansing and detoxifying action",
+        "Helps balance oily and blemish-prone skin",
+        "Revitalizing tea tree aroma"
+      ],
+      "ingredients": [
+        "Activated Bamboo Charcoal",
+        "Tea Tree Essential Oil",
+        "Saponified Coconut & Olive Oils",
+        "Shea Butter"
+      ],
+      "usage": "Work up a rich lather on wet skin. Focus on T-zone or breakout areas. Rinse with tepid water.",
+      "stock": 35,
+      "images": [
+        "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+      ],
+      "rating": 4.7,
+      "reviewCount": 29,
+      "isFeatured": false,
+      "isBestSeller": true,
+      "isNewArrival": false,
+      "weight": "125g",
+      "createdAt": "2026-01-20T14:15:00Z"
+    },
+    {
+      "id": "prod-6",
+      "name": "Fresh Aloe Vera & Cucumber Hydrating Soap",
+      "slug": "aloe-vera-cucumber-hydrating-soap",
+      "category": "Handmade Soaps",
+      "price": 175,
+      "discountPrice": 145,
+      "description": "A cooling, moisture-locking bathing bar packed with fresh inner-leaf aloe vera pulp and cucumber juice. Provides replenishing hydration for parched and sun-exposed skin.",
+      "benefits": [
+        "Cooling and calming sensation on the skin",
+        "Gentle hydration that locks in moisture",
+        "Refreshing clean herbal scent"
+      ],
+      "ingredients": [
+        "Fresh Aloe Barbadensis Leaf Juice",
+        "Cucumber Fruit Extract",
+        "Pure Vegetable Glycerin",
+        "Cold-Pressed Coconut Oil"
+      ],
+      "usage": "Apply liberally during daily shower or bath. Suitable for children and adults.",
+      "stock": 52,
+      "images": [
+        "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+      ],
+      "rating": 5,
+      "reviewCount": 1,
+      "isFeatured": false,
+      "isBestSeller": false,
+      "isNewArrival": true,
+      "weight": "125g",
+      "createdAt": "2026-02-10T16:00:00Z"
+    },
+    {
+      "id": "prod-8",
+      "name": "Raw Cold-Pressed Virgin Coconut Oil (200ml)",
+      "slug": "virgin-coconut-oil-200ml",
+      "category": "Virgin Coconut Oil",
+      "price": 210,
+      "discountPrice": 179,
+      "description": "Convenient travel-friendly squeeze bottle of our highest grade virgin coconut oil. Ideal for daily facial nourishment, dry cuticle conditioning, and hair oiling on the go.",
+      "benefits": [
+        "Compact size for travel or office desk",
+        "Natural makeup remover and moisturizer",
+        "Leak-proof flip cap packaging"
+      ],
+      "ingredients": [
+        "100% Unrefined Virgin Coconut Oil"
+      ],
+      "usage": "Dispense a few drops and gently massage into skin or hair.",
+      "stock": 80,
+      "images": [
+        "/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg"
+      ],
+      "rating": 4.8,
+      "reviewCount": 31,
+      "isFeatured": false,
+      "isBestSeller": false,
+      "isNewArrival": false,
+      "weight": "200ml",
+      "createdAt": "2026-01-22T09:00:00Z"
+    },
+    {
+      "id": "prod-9",
+      "name": "Essential Family Care Combo (Set of 6)",
+      "slug": "essential-family-care-combo",
+      "category": "Combos & Gift Packs",
+      "price": 999,
+      "discountPrice": 799,
+      "description": "Complete family wellness bundle containing 5 bestselling handcrafted soap bars (Neem-Tulsi, Sandalwood, Aloe-Vera, Charcoal, Turmeric) plus 1 bottle of 200ml Virgin Coconut Oil.",
+      "benefits": [
+        "Massive 20% bundle savings",
+        "Caters to diverse skincare preferences in one household",
+        "Sustained supply for 2-3 months"
+      ],
+      "ingredients": [
+        "5 x 125g Assorted Artisan Soaps",
+        "1 x 200ml Virgin Coconut Oil"
+      ],
+      "usage": "Assign according to personal skin type and preference.",
+      "stock": 14,
+      "images": [
+        "/src/assets/images/product_gift_festival_box_1790230452588.jpg"
+      ],
+      "rating": 4.9,
+      "reviewCount": 37,
+      "isFeatured": false,
+      "isBestSeller": true,
+      "isNewArrival": true,
+      "weight": "825g",
+      "createdAt": "2026-02-15T15:20:00Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-soaps",
+      "name": "Handmade Soaps",
+      "slug": "handmade-soaps",
+      "description": "Carefully cold-processed and herbal soaps enriched with pure botanicals and essential oils.",
+      "image": "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg",
+      "itemCount": 3
+    },
+    {
+      "id": "cat-oils",
+      "name": "Virgin Coconut Oil",
+      "slug": "virgin-coconut-oil",
+      "description": "100% pure, cold-pressed virgin coconut oil for hair, skin care, and holistic wellness.",
+      "image": "/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg",
+      "itemCount": 2
+    },
+    {
+      "id": "cat-specialty",
+      "name": "Special Care & Detox",
+      "slug": "special-care",
+      "description": "Targeted skin solutions for deep cleansing, pigmentation reduction, and skin clarifying.",
+      "image": "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg",
+      "itemCount": 2
+    },
+    {
+      "id": "cat-gifts",
+      "name": "Combos & Gift Packs",
+      "slug": "combos-gifts",
+      "description": "Artisanal gift boxes and value packs for festive occasions, family use, and corporate gifting.",
+      "image": "/src/assets/images/product_gift_festival_box_1790230452588.jpg",
+      "itemCount": 2
+    }
+  ],
+  "reviews": [
+    {
+      "id": "rev-1790833283590",
+      "productId": "prod-6",
+      "customerName": "VIVE Admin",
+      "customerEmail": "admin@vivepanya.com",
+      "rating": 5,
+      "comment": "sas",
+      "verifiedPurchase": true,
+      "createdAt": "2026-10-01T05:41:23.590Z"
+    },
+    {
+      "id": "rev-1",
+      "productId": "prod-1",
+      "customerName": "Aarav Sharma",
+      "customerEmail": "aarav@example.com",
+      "rating": 5,
+      "comment": "The Neem & Tulsi soap is genuinely remarkable. My skin usually feels tight and dry after soap bars, but this one creates a rich creamy lather that washes away easily while leaving my face hydrated.",
+      "verifiedPurchase": true,
+      "createdAt": "2026-02-18T10:15:00Z"
+    },
+    {
+      "id": "rev-2",
+      "productId": "prod-2",
+      "customerName": "Priya Sundaram",
+      "customerEmail": "priya@example.com",
+      "rating": 5,
+      "comment": "Purest virgin coconut oil I have purchased online in India. The mild natural fresh coconut fragrance is unmistakable. I use it for weekly hair scalp massage and overnight skin moisture.",
+      "verifiedPurchase": true,
+      "createdAt": "2026-02-22T14:40:00Z"
+    },
+    {
+      "id": "rev-3",
+      "productId": "prod-3",
+      "customerName": "Kavita Menon",
+      "customerEmail": "kavita@example.com",
+      "rating": 5,
+      "comment": "Ordered 5 festival gift boxes for our office executives. The wooden soap rest and packaging aesthetic look ultra-luxurious. Everyone loved the natural scents.",
+      "verifiedPurchase": true,
+      "createdAt": "2026-03-01T08:20:00Z"
+    },
+    {
+      "id": "rev-4",
+      "productId": "prod-5",
+      "customerName": "Rohan Deshmukh",
+      "customerEmail": "rohan@example.com",
+      "rating": 5,
+      "comment": "After three weeks of regular morning use, my stubborn forehead sun tan has noticeably lightened. Very happy with the gentle quality.",
+      "verifiedPurchase": true,
+      "createdAt": "2026-03-05T12:00:00Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ord-1790834149116",
+      "orderNumber": "VP-2026-6226",
+      "customer": {
+        "userId": "usr-1790834106949",
+        "name": "sachin",
+        "email": "sachin@gmail.com",
+        "phone": "656565646"
+      },
+      "deliveryAddress": {
+        "name": "sachin",
+        "phone": "656565646",
+        "email": "sachin@gmail.com",
+        "address": "654475765",
+        "city": "bengluru",
+        "state": "Karnataka",
+        "pincode": "888888"
+      },
+      "items": [
+        {
+          "productId": "prod-2",
+          "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+          "price": 349,
+          "quantity": 3,
+          "image": "/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg"
+        },
+        {
+          "productId": "prod-1",
+          "name": "Neem & Tulsi Herbal Purifying Soap",
+          "price": 149,
+          "quantity": 1,
+          "image": "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+        }
+      ],
+      "subtotal": 1196,
+      "deliveryCharges": 0,
+      "discount": 0,
+      "total": 1196,
+      "paymentMethod": "Cash on Delivery",
+      "paymentStatus": "Pending",
+      "status": "Shipped",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-10-01T05:55:49.116Z",
+          "note": "Order placed via Cash on Delivery"
+        },
+        {
+          "status": "Shipped",
+          "timestamp": "2026-10-01T05:56:22.512Z",
+          "note": "Status changed by Admin"
+        }
+      ],
+      "createdAt": "2026-10-01T05:55:49.116Z",
+      "updatedAt": "2026-10-01T05:56:22.512Z"
+    },
+    {
+      "id": "ord-1002",
+      "orderNumber": "VP-2026-1002",
+      "customer": {
+        "name": "Aarav Sharma",
+        "email": "aarav@example.com",
+        "phone": "+91 99887 76655"
+      },
+      "deliveryAddress": {
+        "name": "Aarav Sharma",
+        "phone": "+91 99887 76655",
+        "email": "aarav@example.com",
+        "address": "B-702 Celestial Towers, Bandra West",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400050"
+      },
+      "items": [
+        {
+          "productId": "prod-3",
+          "name": "Artisanal Festival Gift Box Collection",
+          "price": 749,
+          "quantity": 1,
+          "image": "/src/assets/images/product_gift_festival_box_1790230452588.jpg"
+        }
+      ],
+      "subtotal": 749,
+      "deliveryCharges": 0,
+      "discount": 75,
+      "total": 674,
+      "couponCode": "VIVE10",
+      "paymentMethod": "Cash on Delivery",
+      "paymentStatus": "Pending",
+      "status": "Shipped",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-03-06T14:20:00Z",
+          "note": "Cash on Delivery order placed"
+        },
+        {
+          "status": "Confirmed",
+          "timestamp": "2026-03-06T15:00:00Z",
+          "note": "Customer phone confirmation completed"
+        },
+        {
+          "status": "Packed",
+          "timestamp": "2026-03-06T18:00:00Z",
+          "note": "Gift box sealed and boxed"
+        },
+        {
+          "status": "Shipped",
+          "timestamp": "2026-03-07T11:00:00Z",
+          "note": "Dispatched via Express Courier"
+        }
+      ],
+      "createdAt": "2026-03-06T14:20:00Z",
+      "updatedAt": "2026-03-07T11:00:00Z"
+    },
+    {
+      "id": "ord-1001",
+      "orderNumber": "VP-2026-1001",
+      "customer": {
+        "userId": "usr-customer",
+        "name": "Priya Sundaram",
+        "email": "customer@vivepanya.com",
+        "phone": "+91 98450 12345"
+      },
+      "deliveryAddress": {
+        "name": "Priya Sundaram",
+        "phone": "+91 98450 12345",
+        "email": "customer@vivepanya.com",
+        "address": "42 Orchid Residency, 4th Main Road, Indiranagar",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560038"
+      },
+      "items": [
+        {
+          "productId": "prod-1",
+          "name": "Neem & Tulsi Herbal Purifying Soap",
+          "price": 149,
+          "quantity": 2,
+          "image": "/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
+        },
+        {
+          "productId": "prod-2",
+          "name": "Cold-Pressed Virgin Coconut Oil (500ml)",
+          "price": 349,
+          "quantity": 1,
+          "image": "/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg"
+        }
+      ],
+      "subtotal": 647,
+      "deliveryCharges": 0,
+      "discount": 0,
+      "total": 647,
+      "paymentMethod": "Online Payment",
+      "paymentStatus": "Paid",
+      "status": "Delivered",
+      "timeline": [
+        {
+          "status": "Pending",
+          "timestamp": "2026-03-01T10:00:00Z",
+          "note": "Order placed via Online UPI"
+        },
+        {
+          "status": "Confirmed",
+          "timestamp": "2026-03-01T11:30:00Z",
+          "note": "Payment verified and order confirmed"
+        },
+        {
+          "status": "Packed",
+          "timestamp": "2026-03-01T15:00:00Z",
+          "note": "Item safely packaged with eco-friendly filler"
+        },
+        {
+          "status": "Shipped",
+          "timestamp": "2026-03-02T09:00:00Z",
+          "note": "Dispatched via Blue Dart Express (AWB #8492019)"
+        },
+        {
+          "status": "Out for Delivery",
+          "timestamp": "2026-03-03T08:30:00Z",
+          "note": "Courier out for delivery in Indiranagar"
+        },
+        {
+          "status": "Delivered",
+          "timestamp": "2026-03-03T14:10:00Z",
+          "note": "Package handed over to recipient"
+        }
+      ],
+      "createdAt": "2026-03-01T10:00:00Z",
+      "updatedAt": "2026-03-03T14:10:00Z"
+    }
+  ],
+  "adminPasswordHash": "$2b$08$5XUHaDFbgZTCdhL5rjrFJuNYIq4J4x8.MD/GBZwuEA28l09vRmhKS"
+}
