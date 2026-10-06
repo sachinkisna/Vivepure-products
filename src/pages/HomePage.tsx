@@ -1,3 +1,4 @@
+import { resolveProductImage } from '../components/ProductCard';
 import React, { useState, useEffect } from 'react';
 import { ProductCard } from '../components/ProductCard';
 import { QuickViewModal } from '../components/QuickViewModal';
@@ -121,7 +122,7 @@ export const HomePage: React.FC = () => {
             <div className="lg:col-span-6">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/80 aspect-[16/9] lg:aspect-[4/3] bg-[#EAE5D8]">
                 <img
-                  src="/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
+                  src={resolveProductImage('/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg')}
                   alt="VIVEPANYA Handcrafted Soaps and Virgin Coconut Oil"
                   className="w-full h-full object-cover"
                 />
