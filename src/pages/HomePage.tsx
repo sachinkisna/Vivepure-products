@@ -181,7 +181,7 @@ export const HomePage: React.FC = () => {
             >
               <div className="relative aspect-[4/3] bg-[#EFECE3] overflow-hidden">
                 <img
-                  src={cat.image}
+                  src={resolveProductImage(cat.image)}
                   alt={cat.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
