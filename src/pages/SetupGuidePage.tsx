@@ -79,11 +79,10 @@ export const SetupGuidePage: React.FC = () => {
           <h3 className="font-serif text-xl font-bold text-[#17372F]">2. Setting Up MongoDB (Local or Atlas)</h3>
         </div>
         <p className="text-xs text-[#52615D] leading-relaxed">
-          The application comes built with a robust Dual-Engine architecture:
+          The development server can start while MongoDB is temporarily unavailable, but data-backed API requests require a reachable MongoDB database.
         </p>
         <ul className="text-xs text-[#52615D] space-y-2 list-disc list-inside">
-          <li><strong>Built-in Persistent JSON Store:</strong> Runs out of the box with zero external configuration required. All changes to products, orders, and users persist to <code>data/store.json</code>.</li>
-          <li><strong>MongoDB Connection (Optional/Production):</strong> Create a <code>.env</code> file from <code>.env.example</code>:</li>
+          <li><strong>MongoDB Atlas:</strong> Create a <code>.env</code> file and set <code>MONGODB_URI</code>. Ensure your Atlas cluster is running and your current IP address is allowed in Network Access.</li>
         </ul>
 
         <div className="relative bg-[#1A2522] text-[#A3E6D0] p-4 rounded-2xl font-mono text-xs overflow-x-auto space-y-1">

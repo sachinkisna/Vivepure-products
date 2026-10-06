@@ -63,29 +63,69 @@ export const api = {
     minRating?: number;
     sort?: string;
   }): Promise<Product[]> {
-    try {
-      const query = new URLSearchParams();
-      if (params?.search) query.set('search', params.search);
-      if (params?.category && params.category !== 'All') query.set('category', params.category);
-      if (params?.minPrice !== undefined) query.set('minPrice', params.minPrice.toString());
-      if (params?.maxPrice !== undefined) query.set('maxPrice', params.maxPrice.toString());
-      if (params?.minRating) query.set('minRating', params.minRating.toString());
-      if (params?.sort) query.set('sort', params.sort);
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.category && params.category !== 'All') query.set('category', params.category);
+    if (params?.minPrice !== undefined) query.set('minPrice', params.minPrice.toString());
+    if (params?.maxPrice !== undefined) query.set('maxPrice', params.maxPrice.toString());
+    if (params?.minRating) query.set('minRating', params.minRating.toString());
+    if (params?.sort) query.set('sort', params.sort);
 
+    let list: Product[];
+    try {
       const qs = query.toString();
-      return await request<Product[]>(`/api/products${qs ? `?${qs}` : ''}`);
+      const products = await request<Product[]>(`/api/products${qs ? `?${qs}` : ''}`);
+      if (products.length > 0) {
+        return products;
+      }
+
+      if (qs) {
+        const storedProducts = await request<Product[]>('/api/products');
+        if (storedProducts.length > 0) {
+          return products;
+        }
+      }
+
+      list = [...INITIAL_PRODUCTS];
     } catch {
-      // Graceful fallback to initial products
-      let list = [...INITIAL_PRODUCTS];
-      if (params?.search) {
-        const q = params.search.toLowerCase();
-        list = list.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-      }
-      if (params?.category && params.category !== 'All') {
-        list = list.filter(p => p.category.toLowerCase() === params.category!.toLowerCase());
-      }
-      return list;
+      list = [...INITIAL_PRODUCTS];
     }
+
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      list = list.filter(
+        p =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
+    if (params?.category && params.category !== 'All') {
+      list = list.filter(p => p.category.toLowerCase() === params.category!.toLowerCase());
+    }
+    if (params?.minPrice !== undefined) {
+      list = list.filter(p => (p.discountPrice || p.price) >= params.minPrice!);
+    }
+    if (params?.maxPrice !== undefined) {
+      list = list.filter(p => (p.discountPrice || p.price) <= params.maxPrice!);
+    }
+    if (params?.minRating) {
+      list = list.filter(p => p.rating >= params.minRating!);
+    }
+
+    if (params?.sort === 'price-low') {
+      list.sort((a, b) => (a.discountPrice || a.price) - (b.discountPrice || b.price));
+    } else if (params?.sort === 'price-high') {
+      list.sort((a, b) => (b.discountPrice || b.price) - (a.discountPrice || a.price));
+    } else if (params?.sort === 'rating') {
+      list.sort((a, b) => b.rating - a.rating);
+    } else if (params?.sort === 'newest') {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      list.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+    }
+
+    return list;
   },
 
   async getProductById(id: string): Promise<Product> {

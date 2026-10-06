@@ -14,6 +14,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'vivepanya_ecommerce_secret_key_202
 
 app.use(express.json());
 
+const asyncHandler = (
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+) => (req: Request, res: Response, next: NextFunction) => {
+  void handler(req, res, next).catch(next);
+};
+
 // --- Authentication Middleware ---
 interface AuthRequest extends Request {
   user?: {
@@ -53,7 +59,7 @@ const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
 // ==========================================
 
 // --- Auth Routes ---
-app.post('/api/auth/register', async (req: Request, res: Response) => {
+app.post('/api/auth/register', asyncHandler(async (req: Request, res: Response) => {
   const { name, email, phone, password } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -80,9 +86,9 @@ const newUser = await db.createUser({
   );
 
   res.status(201).json({ user: newUser, token });
-});
+}));
 
-app.post('/api/auth/login', async (req: Request, res: Response) => {
+app.post('/api/auth/login', asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -124,14 +130,14 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   );
 
   res.json({ user, token });
-});
+}));
 
 app.get('/api/auth/me', authenticateToken, (req: AuthRequest, res: Response) => {
   res.json({ user: req.user });
 });
 
 // --- Products Routes ---
-app.get('/api/products', async (req: Request, res: Response) => {
+app.get('/api/products', asyncHandler(async (req: Request, res: Response) => {
   let products = await db.getProducts();
   const { search, category, minPrice, maxPrice, minRating, sort } = req.query;
 
@@ -187,9 +193,9 @@ app.get('/api/products', async (req: Request, res: Response) => {
   }
 
   res.json(products);
-});
+}));
 
-app.get('/api/products/:id', async (req: Request, res: Response) => {
+app.get('/api/products/:id', asyncHandler(async (req: Request, res: Response) => {
   const product = await db.getProductById(req.params.id);
 
   if (!product) {
@@ -197,10 +203,10 @@ app.get('/api/products/:id', async (req: Request, res: Response) => {
   }
 
   res.json(product);
-});
+}));
 
 // Admin Add Product
-app.post('/api/products', requireAdmin, (req: Request, res: Response) => {
+app.post('/api/products', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const { name, category, price, discountPrice, description, stock, images, benefits, ingredients, weight } = req.body;
   if (!name || !price || !category) {
     return res.status(400).json({ error: 'Product name, category and price are required' });
@@ -228,35 +234,35 @@ app.post('/api/products', requireAdmin, (req: Request, res: Response) => {
     createdAt: new Date().toISOString(),
   };
 
-  const created = db.createProduct(newProduct);
+  const created = await db.createProduct(newProduct);
   res.status(201).json(created);
-});
+}));
 
 // Admin Update Product
-app.put('/api/products/:id', requireAdmin, (req: Request, res: Response) => {
-  const updated = db.updateProduct(req.params.id, req.body);
+app.put('/api/products/:id', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const updated = await db.updateProduct(req.params.id, req.body);
   if (!updated) {
     return res.status(404).json({ error: 'Product not found' });
   }
   res.json(updated);
-});
+}));
 
 // Admin Delete Product
-app.delete('/api/products/:id', requireAdmin, (req: Request, res: Response) => {
-  const deleted = db.deleteProduct(req.params.id);
+app.delete('/api/products/:id', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const deleted = await db.deleteProduct(req.params.id);
   if (!deleted) {
     return res.status(404).json({ error: 'Product not found' });
   }
   res.json({ success: true, message: 'Product removed' });
-});
+}));
 
 // --- Categories ---
-app.get('/api/categories', async (_req: Request, res: Response) => {
+app.get('/api/categories', asyncHandler(async (_req: Request, res: Response) => {
   const categories = await db.getCategories();
   res.json(categories);
-});
+}));
 
-app.post('/api/categories', requireAdmin, (req: Request, res: Response) => {
+app.post('/api/categories', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const { name, description, image } = req.body;
   if (!name) return res.status(400).json({ error: 'Category name required' });
 
@@ -269,12 +275,12 @@ app.post('/api/categories', requireAdmin, (req: Request, res: Response) => {
     image: image || '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg',
     itemCount: 0,
   };
-  db.createCategory(cat);
-  res.status(201).json(cat);
-});
+  const created = await db.createCategory(cat);
+  res.status(201).json(created);
+}));
 
 // --- Orders ---
-app.post('/api/orders', (req: Request, res: Response) => {
+app.post('/api/orders', asyncHandler(async (req: Request, res: Response) => {
   const { customer, deliveryAddress, items, subtotal, deliveryCharges, discount, total, paymentMethod, couponCode } = req.body;
 
   if (!items || !items.length || !deliveryAddress) {
@@ -314,58 +320,58 @@ app.post('/api/orders', (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
   };
 
-  const savedOrder = db.createOrder(newOrder);
+  const savedOrder = await db.createOrder(newOrder);
   res.status(201).json(savedOrder);
-});
+}));
 
-app.get('/api/orders', (req: Request, res: Response) => {
+app.get('/api/orders', asyncHandler(async (req: Request, res: Response) => {
   const { email, admin } = req.query;
 
   if (admin === 'true') {
-    return res.json(db.getOrders());
+    return res.json(await db.getOrders());
   }
 
   if (email && typeof email === 'string') {
-    return res.json(db.getOrdersByCustomerEmail(email));
+    return res.json(await db.getOrdersByCustomerEmail(email));
   }
 
-  res.json(db.getOrders());
-});
+  res.json(await db.getOrders());
+}));
 
-app.get('/api/orders/:id', (req: Request, res: Response) => {
-  const order = db.getOrderById(req.params.id);
+app.get('/api/orders/:id', asyncHandler(async (req: Request, res: Response) => {
+  const order = await db.getOrderById(req.params.id);
   if (!order) {
     return res.status(404).json({ error: 'Order not found' });
   }
   res.json(order);
-});
+}));
 
 // Update order status (Admin)
-app.put('/api/orders/:id/status', requireAdmin, (req: Request, res: Response) => {
+app.put('/api/orders/:id/status', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const { status, note } = req.body;
   if (!status) return res.status(400).json({ error: 'Status is required' });
 
-  const updated = db.updateOrderStatus(req.params.id, status, note);
+  const updated = await db.updateOrderStatus(req.params.id, status, note);
   if (!updated) return res.status(404).json({ error: 'Order not found' });
 
   res.json(updated);
-});
+}));
 
 // Cancel Order
-app.put('/api/orders/:id/cancel', (req: Request, res: Response) => {
+app.put('/api/orders/:id/cancel', asyncHandler(async (req: Request, res: Response) => {
   const { reason } = req.body;
-  const cancelled = db.cancelOrder(req.params.id, reason || 'Cancelled by customer');
+  const cancelled = await db.cancelOrder(req.params.id, reason || 'Cancelled by customer');
   if (!cancelled) return res.status(404).json({ error: 'Order not found' });
 
   res.json(cancelled);
-});
+}));
 
 // --- Reviews ---
-app.get('/api/reviews/:productId', (req: Request, res: Response) => {
-  res.json(db.getReviewsForProduct(req.params.productId));
-});
+app.get('/api/reviews/:productId', asyncHandler(async (req: Request, res: Response) => {
+  res.json(await db.getReviewsForProduct(req.params.productId));
+}));
 
-app.post('/api/reviews', (req: Request, res: Response) => {
+app.post('/api/reviews', asyncHandler(async (req: Request, res: Response) => {
   const { productId, customerName, customerEmail, rating, comment } = req.body;
   if (!productId || !customerName || !rating || !comment) {
     return res.status(400).json({ error: 'Product, customer name, rating, and comment are required' });
@@ -382,16 +388,16 @@ app.post('/api/reviews', (req: Request, res: Response) => {
     createdAt: new Date().toISOString(),
   };
 
-  const saved = db.addReview(review);
+  const saved = await db.addReview(review);
   res.status(201).json(saved);
-});
+}));
 
 // --- Admin Stats & Customers ---
-app.get('/api/admin/stats', requireAdmin, (_req: Request, res: Response) => {
-  res.json(db.getStats());
-});
+app.get('/api/admin/stats', requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await db.getStats());
+}));
 
-app.get('/api/admin/customers', async (req: Request, res: Response) => {
+app.get('/api/admin/customers', asyncHandler(async (req: Request, res: Response) => {
  const users = (await db.getUsers()).filter(u => u.role === 'customer');
   const orders = await db.getOrders();
 
@@ -407,7 +413,7 @@ app.get('/api/admin/customers', async (req: Request, res: Response) => {
   });
 
   res.json(customerList);
-});
+}));
 
 // ==========================================
 // STATIC ASSETS & VITE INTEGRATION
@@ -430,14 +436,43 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`🚀 VIVEPANYA E-Mart Server running on http://0.0.0.0:${PORT}`);
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('❌ Request failed:', error);
+
+    if (res.headersSent) {
+      return;
+    }
+
+    const databaseUnavailable =
+      error instanceof Error &&
+      ['MongoNetworkError', 'MongoServerSelectionError'].includes(error.name);
+
+    res.status(databaseUnavailable ? 503 : 500).json({
+      error: databaseUnavailable
+        ? 'Database is currently unavailable'
+        : 'Internal server error',
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 VIVEPANYA E-Mart Server running on http://0.0.0.0:${PORT}`);
+      resolve();
+    });
+    server.once('error', reject);
   });
 }
 
-connectMongoDB()
-  .then(() => startServer())
+startServer()
+  .then(() => {
+    void connectMongoDB().catch((error) => {
+      console.error(
+        '❌ MongoDB connection failed; database-backed API requests will remain unavailable until MongoDB is reachable:',
+        error
+      );
+    });
+  })
   .catch((error) => {
-    console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
+    console.error('❌ Server startup failed:', error);
+    process.exitCode = 1;
   });
