@@ -1,3 +1,4 @@
+import { resolveProductImage } from '../components/ProductCard';
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
@@ -55,7 +56,7 @@ export const CategoriesPage: React.FC = () => {
             >
               <div className="sm:w-1/2 aspect-[4/3] sm:aspect-auto overflow-hidden bg-[#F2EEE4] relative">
                 <img
-                  src={cat.image}
+                 src={resolveProductImage(cat.image)}
                   alt={cat.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
