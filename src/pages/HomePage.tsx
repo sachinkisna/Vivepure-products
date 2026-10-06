@@ -296,7 +296,7 @@ export const HomePage: React.FC = () => {
 
           <div className="lg:col-span-5 bg-[#1F4E42] relative min-h-[300px]">
             <img
-              src="/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg"
+              src={resolveProductImage('/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg')}
               alt="Cold-Pressed Virgin Coconut Oil"
               className="w-full h-full object-cover"
             />
