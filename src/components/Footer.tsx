@@ -3,8 +3,10 @@ import { ViveLogo } from './ViveLogo';
 import { useShop } from '../context/ShopContext';
 import { MapPin, Phone, Mail, Clock, ArrowRight, ShieldCheck, Truck, RefreshCw, Award } from 'lucide-react';
 
-export const Footer: React.FC = () => {
-  const { setActivePage, setSelectedCategory } = useShop();
+type AuthMode = 'login' | 'register';
+
+export const Footer: React.FC<{ onOpenAuth: (mode?: AuthMode) => void }> = ({ onOpenAuth }) => {
+  const { setActivePage, setSelectedCategory, user } = useShop();
 
   const handleNav = (page: string, cat?: string) => {
     if (cat) setSelectedCategory(cat);
@@ -107,16 +109,20 @@ export const Footer: React.FC = () => {
                   Track My Order
                 </button>
               </li>
-              <li>
-                <button onClick={() => handleNav('guide')} className="text-[#B9944A] hover:underline cursor-pointer">
-                  Setup & Deployment Guide
-                </button>
-              </li>
-              <li>
-                <button onClick={() => handleNav('admin')} className="text-emerald-400 hover:underline cursor-pointer">
-                  Seller / Admin Dashboard
-                </button>
-              </li>
+              {!user && (
+                <>
+                  <li>
+                    <button onClick={() => onOpenAuth('login')} className="hover:text-white transition-colors cursor-pointer">
+                      User Login
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => onOpenAuth('register')} className="hover:text-white transition-colors cursor-pointer">
+                      Register
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 

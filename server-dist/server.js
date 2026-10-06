@@ -28,6 +28,14 @@ async function connectMongoDB() {
   }
   await client.connect();
   db = client.db("vivepanya");
+  await db.collection("users").createIndex(
+    { email: 1 },
+    {
+      unique: true,
+      collation: { locale: "en", strength: 2 },
+      name: "users_email_case_insensitive_unique"
+    }
+  );
   console.log("\u2705 Connected to MongoDB Atlas");
   return db;
 }
@@ -37,44 +45,70 @@ async function getMongoDB() {
   }
   return connectMongoDB();
 }
+function getMongoClient() {
+  return client;
+}
 
 // server.ts
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import bcrypt2 from "bcryptjs";
+import { randomUUID } from "node:crypto";
 
 // src/server/db.ts
 import bcrypt from "bcryptjs";
+var EMAIL_COLLATION = { locale: "en", strength: 2 };
+var InsufficientStockError = class extends Error {
+  constructor() {
+    super("One or more products are unavailable or have insufficient stock.");
+    this.name = "InsufficientStockError";
+  }
+};
 var Database = class {
   // =========================
   // Users & Auth
   // =========================
   async getUsers() {
     const db3 = await getMongoDB();
-    return db3.collection("users").find({}).toArray();
+    return db3.collection("users").find({}, { projection: { passwordHash: 0 } }).toArray();
   }
   async findUserByEmail(email) {
     const db3 = await getMongoDB();
-    const user = await db3.collection("users").findOne({
-      email: { $regex: `^${escapeRegex(email)}$`, $options: "i" }
-    });
+    const user = await db3.collection("users").findOne(
+      { email: email.trim().toLowerCase() },
+      { collation: EMAIL_COLLATION }
+    );
+    return user ?? void 0;
+  }
+  async findUserById(id) {
+    const db3 = await getMongoDB();
+    const user = await db3.collection("users").findOne({ id });
     return user ?? void 0;
   }
   async createUser(user) {
     const db3 = await getMongoDB();
     await db3.collection("users").insertOne(user);
-    return user;
+    return this.toPublicUser(user);
   }
-  async verifyAdminPassword(password) {
+  async verifyAdminCredentials(email, password) {
     const db3 = await getMongoDB();
     const settings = await db3.collection(
       "settings"
     ).findOne({ _id: "admin" });
-    if (!settings?.adminPasswordHash) {
+    if (!settings?.adminEmail || settings.adminEmail.trim().toLowerCase() !== email.trim().toLowerCase() || !settings.adminPasswordHash) {
       return false;
     }
     return bcrypt.compare(password, settings.adminPasswordHash);
+  }
+  async isAdminIdentity(id, email) {
+    if (id !== "admin") return false;
+    const db3 = await getMongoDB();
+    const settings = await db3.collection("settings").findOne({ _id: "admin" });
+    return Boolean(
+      settings?.adminEmail && settings.adminPasswordHash && settings.adminEmail.trim().toLowerCase() === email.trim().toLowerCase()
+    );
   }
   // =========================
   // Products
@@ -161,61 +195,45 @@ var Database = class {
     const db3 = await getMongoDB();
     return db3.collection("orders").find({}).sort({ createdAt: -1 }).toArray();
   }
-  async getOrdersByCustomerEmail(email) {
+  async getOrdersForCustomer(userId, email) {
     const db3 = await getMongoDB();
+    const normalizedEmail = email.trim().toLowerCase();
     return db3.collection("orders").find({
       $or: [
-        {
-          "customer.email": {
-            $regex: `^${escapeRegex(email)}$`,
-            $options: "i"
-          }
-        },
-        {
-          "deliveryAddress.email": {
-            $regex: `^${escapeRegex(email)}$`,
-            $options: "i"
-          }
-        }
+        { "customer.userId": userId },
+        { "customer.email": normalizedEmail }
       ]
-    }).sort({ createdAt: -1 }).toArray();
+    }).sort({ createdAt: -1 }).collation(EMAIL_COLLATION).toArray();
   }
   async getOrderById(id) {
     const db3 = await getMongoDB();
     const order = await db3.collection("orders").findOne({
       $or: [
         { id },
-        { orderNumber: { $regex: `^${escapeRegex(id)}$`, $options: "i" } }
+        { orderNumber: id }
       ]
     });
     return order ?? void 0;
   }
   async createOrder(order) {
     const db3 = await getMongoDB();
-    for (const item of order.items) {
-      await db3.collection("products").updateOne(
-        { id: item.productId },
-        {
-          $inc: {
-            stock: -item.quantity
+    const session = getMongoClient().startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const item of order.items) {
+          const result = await db3.collection("products").updateOne(
+            { id: item.productId, stock: { $gte: item.quantity } },
+            { $inc: { stock: -item.quantity } },
+            { session }
+          );
+          if (result.matchedCount !== 1) {
+            throw new InsufficientStockError();
           }
         }
-      );
-    }
-    await db3.collection("orders").insertOne(order);
-    const existingUser = await this.findUserByEmail(
-      order.deliveryAddress.email
-    );
-    if (!existingUser) {
-      const newUser = {
-        id: `usr-${Date.now()}`,
-        name: order.deliveryAddress.name,
-        email: order.deliveryAddress.email,
-        phone: order.deliveryAddress.phone,
-        role: "customer",
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      await this.createUser(newUser);
+        await db3.collection("orders").insertOne(order, { session });
+      });
+    } finally {
+      await session.endSession();
     }
     return order;
   }
@@ -235,9 +253,6 @@ var Database = class {
       status,
       updatedAt: now
     };
-    if (status === "Delivered") {
-      update.paymentStatus = "Paid";
-    }
     await db3.collection("orders").updateOne(
       { id: order.id },
       {
@@ -251,42 +266,62 @@ var Database = class {
   }
   async cancelOrder(id, reason) {
     const db3 = await getMongoDB();
-    const order = await this.getOrderById(id);
-    if (!order) {
-      return null;
-    }
-    if (order.status === "Cancelled") {
-      return order;
-    }
+    const session = getMongoClient().startSession();
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    await db3.collection("orders").updateOne(
-      { id: order.id },
-      {
-        $set: {
-          status: "Cancelled",
-          cancellationReason: reason,
-          updatedAt: now
-        },
-        $push: {
-          timeline: {
-            status: "Cancelled",
-            timestamp: now,
-            note: `Cancelled: ${reason}`
-          }
+    let cancelled = false;
+    try {
+      await session.withTransaction(async () => {
+        cancelled = false;
+        const order = await db3.collection("orders").findOne(
+          { $or: [{ id }, { orderNumber: id }] },
+          { session }
+        );
+        if (!order || order.status === "Cancelled") return;
+        if (order.status !== "Pending" && order.status !== "Confirmed") return;
+        const result = await db3.collection("orders").updateOne(
+          { id: order.id, status: { $in: ["Pending", "Confirmed"] } },
+          {
+            $set: {
+              status: "Cancelled",
+              cancellationReason: reason,
+              updatedAt: now
+            },
+            $push: {
+              timeline: {
+                status: "Cancelled",
+                timestamp: now,
+                note: `Cancelled: ${reason}`
+              }
+            }
+          },
+          { session }
+        );
+        if (result.modifiedCount !== 1) return;
+        for (const item of order.items) {
+          await db3.collection("products").updateOne(
+            { id: item.productId },
+            { $inc: { stock: item.quantity } },
+            { session }
+          );
         }
-      }
-    );
-    for (const item of order.items) {
-      await db3.collection("products").updateOne(
-        { id: item.productId },
-        {
-          $inc: {
-            stock: item.quantity
-          }
-        }
-      );
+        cancelled = true;
+      });
+    } finally {
+      await session.endSession();
     }
-    return this.getOrderById(order.id).then((result) => result ?? null);
+    return { order: await this.getOrderById(id) ?? null, cancelled };
+  }
+  async hasVerifiedPurchase(userId, email, productId) {
+    const db3 = await getMongoDB();
+    const order = await db3.collection("orders").findOne({
+      status: "Delivered",
+      "items.productId": productId,
+      $or: [
+        { "customer.userId": userId },
+        { "customer.email": email.trim().toLowerCase() }
+      ]
+    }, { collation: EMAIL_COLLATION });
+    return Boolean(order);
   }
   // =========================
   // Reviews
@@ -319,7 +354,7 @@ var Database = class {
     const orders = await db3.collection("orders").find({}).toArray();
     const products = await db3.collection("products").find({}).toArray();
     const users = await db3.collection("users").find({}).toArray();
-    const totalSales = orders.filter((order) => order.status !== "Cancelled").reduce((sum, order) => sum + order.total, 0);
+    const totalSales = orders.filter((order) => order.paymentStatus === "Paid" && order.status !== "Cancelled").reduce((sum, order) => sum + order.total, 0);
     const pendingOrders = orders.filter(
       (order) => order.status === "Pending"
     ).length;
@@ -339,103 +374,183 @@ var Database = class {
       lowStockProducts
     };
   }
+  toPublicUser(user) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.createdAt
+    };
+  }
 };
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 var db2 = new Database();
 
 // server.ts
 dotenv.config();
 var app = express();
 var PORT = process.env.PORT || 3e3;
-var JWT_SECRET = process.env.JWT_SECRET || "vivepanya_ecommerce_secret_key_2026";
+var JWT_SECRET = process.env.JWT_SECRET?.trim();
+if (!JWT_SECRET || Buffer.byteLength(JWT_SECRET, "utf8") < 32) {
+  throw new Error("JWT_SECRET must be configured with at least 32 random bytes.");
+}
 app.use(express.json());
 var asyncHandler = (handler) => (req, res, next) => {
   void handler(req, res, next).catch(next);
 };
-var authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ error: "Access token required" });
+var requireAuth = asyncHandler(async (req, res, next) => {
+  const authorization = req.headers.authorization;
+  const match = typeof authorization === "string" ? authorization.match(/^Bearer\s+([^\s]+)$/i) : null;
+  if (!match) {
+    return res.status(401).json({ error: "Authentication required" });
   }
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: "Invalid or expired token" });
-    req.user = decoded;
-    next();
-  });
-};
-var requireAdmin = (req, res, next) => {
-  authenticateToken(req, res, () => {
-    if (req.user?.role !== "admin") {
+  const token = match[1];
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  let subject;
+  let tokenEmail;
+  try {
+    const verified = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
+    if (typeof verified === "string") {
+      return res.status(401).json({ error: "Invalid or expired authentication" });
+    }
+    if (typeof verified.sub !== "string" || typeof verified.email !== "string") {
+      return res.status(401).json({ error: "Invalid or expired authentication" });
+    }
+    subject = verified.sub;
+    tokenEmail = verified.email;
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ error: "Invalid or expired authentication" });
+    }
+    throw error;
+  }
+  let authenticatedUser;
+  if (subject === "admin" && await db2.isAdminIdentity(subject, tokenEmail)) {
+    authenticatedUser = {
+      id: "admin",
+      email: tokenEmail,
+      role: "admin",
+      name: "VIVE Admin",
+      createdAt: ""
+    };
+  } else {
+    const user = await db2.findUserById(subject);
+    if (!user || user.role !== "customer" || user.email.toLowerCase() !== tokenEmail.toLowerCase()) {
+      return res.status(401).json({ error: "Invalid or expired authentication" });
+    }
+    authenticatedUser = {
+      id: user.id,
+      email: user.email,
+      role: "customer",
+      name: user.name,
+      phone: user.phone,
+      createdAt: user.createdAt
+    };
+  }
+  req.user = authenticatedUser;
+  next();
+});
+var requireAdmin = [
+  requireAuth,
+  (req, res, next) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    if (user.role !== "admin") {
       return res.status(403).json({ error: "Admin privileges required" });
     }
     next();
-  });
+  }
+];
+var requireCustomer = [
+  requireAuth,
+  (req, res, next) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    if (user.role !== "customer") {
+      return res.status(403).json({ error: "Customer account required" });
+    }
+    next();
+  }
+];
+var publicUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  phone: user.phone,
+  role: user.role,
+  createdAt: user.createdAt
+});
+var makeToken = (user) => jwt.sign(
+  { email: user.email, role: user.role },
+  JWT_SECRET,
+  { subject: user.id, expiresIn: "7d", algorithm: "HS256" }
+);
+var isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+var isValidPassword = (password) => {
+  const byteLength = Buffer.byteLength(password, "utf8");
+  return password.length >= 8 && byteLength <= 72;
 };
 app.post("/api/auth/register", asyncHandler(async (req, res) => {
-  const { name, email, phone, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Name, email, and password are required" });
+  const { name, email, phone, password } = req.body ?? {};
+  if (typeof name !== "string" || name.trim().length < 2 || name.trim().length > 100 || typeof email !== "string" || !isValidEmail(email.trim()) || typeof password !== "string" || !isValidPassword(password) || phone !== void 0 && (typeof phone !== "string" || phone.length > 30)) {
+    return res.status(400).json({ error: "Enter a valid name, email, password, and phone number." });
   }
-  const existing = await db2.findUserByEmail(email);
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await db2.findUserByEmail(normalizedEmail);
   if (existing) {
-    return res.status(409).json({ error: "Account with this email already exists" });
+    return res.status(409).json({ error: "An account with this email already exists." });
   }
-  const newUser = await db2.createUser({
-    id: `usr-${Date.now()}`,
-    name,
-    email,
-    phone: phone || "",
+  const passwordHash = await bcrypt2.hash(password, 12);
+  const user = {
+    id: `usr-${randomUUID()}`,
+    name: name.trim(),
+    email: normalizedEmail,
+    phone: typeof phone === "string" ? phone.trim() : "",
     role: "customer",
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  });
-  const token = jwt.sign(
-    { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-  res.status(201).json({ user: newUser, token });
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    passwordHash
+  };
+  try {
+    const createdUser = await db2.createUser(user);
+    res.status(201).json({ user: publicUser(createdUser), token: makeToken(createdUser) });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11e3) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+    throw error;
+  }
 }));
 app.post("/api/auth/login", asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  const { email, password } = req.body ?? {};
+  if (typeof email !== "string" || !isValidEmail(email.trim()) || typeof password !== "string" || !password) {
+    return res.status(400).json({ error: "Enter a valid email and password." });
   }
-  if (email.toLowerCase() === "admin@vivepanya.com") {
-    if (await db2.verifyAdminPassword(password)) {
-      const token2 = jwt.sign(
-        { id: "usr-admin", email: "admin@vivepanya.com", name: "VIVE Admin", role: "admin" },
-        JWT_SECRET,
-        { expiresIn: "7d" }
-      );
-      return res.json({
-        user: {
-          id: "usr-admin",
-          name: "VIVE Admin",
-          email: "admin@vivepanya.com",
-          role: "admin",
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        token: token2
-      });
-    } else {
-      return res.status(401).json({ error: "Invalid admin credentials" });
-    }
+  const normalizedEmail = email.trim().toLowerCase();
+  if (await db2.verifyAdminCredentials(normalizedEmail, password)) {
+    const admin = {
+      id: "admin",
+      email: normalizedEmail,
+      name: "VIVE Admin",
+      role: "admin",
+      createdAt: ""
+    };
+    return res.json({ user: publicUser(admin), token: makeToken(admin) });
   }
-  const user = await db2.findUserByEmail(email);
-  if (!user) {
-    return res.status(404).json({ error: "User account not found" });
+  const user = await db2.findUserByEmail(normalizedEmail);
+  if (!user?.passwordHash || !await bcrypt2.compare(password, user.passwordHash)) {
+    return res.status(401).json({ error: "Invalid email or password." });
   }
-  const token = jwt.sign(
-    { id: user.id, email: user.email, name: user.name, role: user.role },
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-  res.json({ user, token });
+  const safeUser = publicUser(user);
+  res.json({ user: safeUser, token: makeToken(safeUser) });
 }));
-app.get("/api/auth/me", authenticateToken, (req, res) => {
+app.get("/api/auth/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 app.get("/api/products", asyncHandler(async (req, res) => {
@@ -552,91 +667,185 @@ app.post("/api/categories", requireAdmin, asyncHandler(async (req, res) => {
   const created = await db2.createCategory(cat);
   res.status(201).json(created);
 }));
-app.post("/api/orders", asyncHandler(async (req, res) => {
-  const { customer, deliveryAddress, items, subtotal, deliveryCharges, discount, total, paymentMethod, couponCode } = req.body;
-  if (!items || !items.length || !deliveryAddress) {
-    return res.status(400).json({ error: "Items and delivery address are required" });
+app.post("/api/orders", requireCustomer, asyncHandler(async (req, res) => {
+  const user = req.user;
+  const body = req.body ?? {};
+  const deliveryAddress = body.deliveryAddress;
+  const requestedItems = body.items;
+  if (!deliveryAddress || typeof deliveryAddress !== "object" || ["name", "phone", "email", "address", "city", "state", "pincode"].some(
+    (field) => typeof deliveryAddress[field] !== "string" || !deliveryAddress[field].trim()
+  ) || !isValidEmail(deliveryAddress.email.trim()) || !Array.isArray(requestedItems) || requestedItems.length === 0 || requestedItems.length > 20) {
+    return res.status(400).json({ error: "Valid delivery details and order items are required." });
   }
-  const orderNumber = `VP-${(/* @__PURE__ */ new Date()).getFullYear()}-${Math.floor(1e3 + Math.random() * 9e3)}`;
-  const orderId = `ord-${Date.now()}`;
+  const quantities = /* @__PURE__ */ new Map();
+  for (const item of requestedItems) {
+    if (!item || typeof item.productId !== "string" || !item.productId.trim() || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100) {
+      return res.status(400).json({ error: "Each order item must have a valid product and quantity." });
+    }
+    const quantity = (quantities.get(item.productId) ?? 0) + item.quantity;
+    if (quantity > 100) {
+      return res.status(400).json({ error: "The quantity for each product cannot exceed 100." });
+    }
+    quantities.set(item.productId, quantity);
+  }
+  if (body.paymentMethod !== "Cash on Delivery" && body.paymentMethod !== "Online Payment") {
+    return res.status(400).json({ error: "Choose a supported payment method." });
+  }
+  const orderItems = [];
+  let subtotal = 0;
+  for (const [productId, quantity] of quantities) {
+    const product = await db2.getProductById(productId);
+    if (!product) {
+      return res.status(404).json({ error: "One or more products could not be found." });
+    }
+    if (product.stock < quantity) {
+      return res.status(409).json({ error: `Insufficient stock for ${product.name}.` });
+    }
+    const price = product.discountPrice ?? product.price;
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error("Product has invalid pricing data.");
+    }
+    orderItems.push({
+      productId: product.id,
+      name: product.name,
+      price,
+      quantity,
+      image: product.images[0] ?? ""
+    });
+    subtotal += price * quantity;
+  }
+  const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim().toUpperCase() : void 0;
+  let discount = 0;
+  if (couponCode === "VIVE10") {
+    discount = Math.round(subtotal * 0.1);
+  } else if (couponCode === "WELCOME20") {
+    discount = Math.round(subtotal * 0.2);
+  } else if (couponCode === "FLAT100" && subtotal >= 500) {
+    discount = 100;
+  } else if (couponCode) {
+    return res.status(400).json({ error: "The coupon code is invalid or does not meet its requirements." });
+  }
+  const deliveryCharges = subtotal > 499 ? 0 : 50;
+  const total = Math.max(0, subtotal + deliveryCharges - discount);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const orderNumber = `VP-${(/* @__PURE__ */ new Date()).getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+  const normalizedDeliveryAddress = {
+    name: deliveryAddress.name.trim(),
+    phone: deliveryAddress.phone.trim(),
+    email: deliveryAddress.email.trim().toLowerCase(),
+    address: deliveryAddress.address.trim(),
+    city: deliveryAddress.city.trim(),
+    state: deliveryAddress.state.trim(),
+    pincode: deliveryAddress.pincode.trim()
+  };
   const newOrder = {
-    id: orderId,
+    id: `ord-${randomUUID()}`,
     orderNumber,
     customer: {
-      userId: customer?.userId,
-      name: deliveryAddress.name,
-      email: deliveryAddress.email,
-      phone: deliveryAddress.phone
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || normalizedDeliveryAddress.phone
     },
-    deliveryAddress,
-    items,
-    subtotal: Number(subtotal),
-    deliveryCharges: Number(deliveryCharges) || 0,
-    discount: Number(discount) || 0,
-    total: Number(total),
+    deliveryAddress: normalizedDeliveryAddress,
+    items: orderItems,
+    subtotal,
+    deliveryCharges,
+    discount,
+    total,
     couponCode,
-    paymentMethod: paymentMethod === "Online Payment" ? "Online Payment" : "Cash on Delivery",
-    paymentStatus: paymentMethod === "Online Payment" ? "Paid" : "Pending",
+    paymentMethod: body.paymentMethod,
+    paymentStatus: "Pending",
     status: "Pending",
     timeline: [
       {
         status: "Pending",
-        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-        note: `Order placed via ${paymentMethod}`
+        timestamp: now,
+        note: body.paymentMethod === "Online Payment" ? "Order placed; payment is pending server-side verification." : "Order placed with cash on delivery."
       }
     ],
-    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    createdAt: now,
+    updatedAt: now
   };
-  const savedOrder = await db2.createOrder(newOrder);
-  res.status(201).json(savedOrder);
+  try {
+    res.status(201).json(await db2.createOrder(newOrder));
+  } catch (error) {
+    if (error instanceof InsufficientStockError) {
+      return res.status(409).json({ error: "One or more products are no longer available in the requested quantity." });
+    }
+    throw error;
+  }
 }));
-app.get("/api/orders", asyncHandler(async (req, res) => {
-  const { email, admin } = req.query;
-  if (admin === "true") {
+app.get("/api/orders", requireAuth, asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (user.role === "admin") {
     return res.json(await db2.getOrders());
   }
-  if (email && typeof email === "string") {
-    return res.json(await db2.getOrdersByCustomerEmail(email));
-  }
-  res.json(await db2.getOrders());
+  res.json(await db2.getOrdersForCustomer(user.id, user.email));
 }));
-app.get("/api/orders/:id", asyncHandler(async (req, res) => {
+app.get("/api/orders/:id", requireAuth, asyncHandler(async (req, res) => {
+  const user = req.user;
   const order = await db2.getOrderById(req.params.id);
-  if (!order) {
-    return res.status(404).json({ error: "Order not found" });
+  if (!order || user.role !== "admin" && order.customer.userId !== user.id && (order.customer.email || "").toLowerCase() !== user.email.toLowerCase()) {
+    return res.status(404).json({ error: "Order not found." });
   }
   res.json(order);
 }));
 app.put("/api/orders/:id/status", requireAdmin, asyncHandler(async (req, res) => {
   const { status, note } = req.body;
-  if (!status) return res.status(400).json({ error: "Status is required" });
-  const updated = await db2.updateOrderStatus(req.params.id, status, note);
-  if (!updated) return res.status(404).json({ error: "Order not found" });
+  const validStatuses = [
+    "Pending",
+    "Confirmed",
+    "Packed",
+    "Shipped",
+    "Out for Delivery",
+    "Delivered"
+  ];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: "A valid order status is required." });
+  }
+  const updated = await db2.updateOrderStatus(
+    req.params.id,
+    status,
+    typeof note === "string" ? note.slice(0, 500) : void 0
+  );
+  if (!updated) return res.status(404).json({ error: "Order not found." });
   res.json(updated);
 }));
-app.put("/api/orders/:id/cancel", asyncHandler(async (req, res) => {
-  const { reason } = req.body;
-  const cancelled = await db2.cancelOrder(req.params.id, reason || "Cancelled by customer");
-  if (!cancelled) return res.status(404).json({ error: "Order not found" });
-  res.json(cancelled);
+app.put("/api/orders/:id/cancel", requireAuth, asyncHandler(async (req, res) => {
+  const user = req.user;
+  const existing = await db2.getOrderById(req.params.id);
+  if (!existing || user.role !== "admin" && existing.customer.userId !== user.id && (existing.customer.email || "").toLowerCase() !== user.email.toLowerCase()) {
+    return res.status(404).json({ error: "Order not found." });
+  }
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+  const result = await db2.cancelOrder(req.params.id, reason || "Cancelled by customer");
+  if (!result.order) return res.status(404).json({ error: "Order not found." });
+  if (!result.cancelled && result.order.status !== "Cancelled") {
+    return res.status(409).json({ error: "This order is no longer eligible for cancellation." });
+  }
+  res.json(result.order);
 }));
 app.get("/api/reviews/:productId", asyncHandler(async (req, res) => {
   res.json(await db2.getReviewsForProduct(req.params.productId));
 }));
-app.post("/api/reviews", asyncHandler(async (req, res) => {
-  const { productId, customerName, customerEmail, rating, comment } = req.body;
-  if (!productId || !customerName || !rating || !comment) {
-    return res.status(400).json({ error: "Product, customer name, rating, and comment are required" });
+app.post("/api/reviews", requireCustomer, asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { productId, rating, comment } = req.body ?? {};
+  if (typeof productId !== "string" || !productId.trim() || !Number.isInteger(rating) || rating < 1 || rating > 5 || typeof comment !== "string" || !comment.trim() || comment.trim().length > 2e3) {
+    return res.status(400).json({ error: "A valid product, rating, and review comment are required." });
+  }
+  if (!await db2.getProductById(productId)) {
+    return res.status(404).json({ error: "Product not found." });
   }
   const review = {
-    id: `rev-${Date.now()}`,
+    id: `rev-${randomUUID()}`,
     productId,
-    customerName,
-    customerEmail: customerEmail || "",
-    rating: Number(rating),
-    comment,
-    verifiedPurchase: true,
+    customerName: user.name,
+    customerEmail: user.email,
+    rating,
+    comment: comment.trim(),
+    verifiedPurchase: await db2.hasVerifiedPurchase(user.id, user.email, productId),
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
   const saved = await db2.addReview(review);
@@ -645,14 +854,19 @@ app.post("/api/reviews", asyncHandler(async (req, res) => {
 app.get("/api/admin/stats", requireAdmin, asyncHandler(async (_req, res) => {
   res.json(await db2.getStats());
 }));
-app.get("/api/admin/customers", asyncHandler(async (req, res) => {
+app.get("/api/admin/customers", requireAdmin, asyncHandler(async (_req, res) => {
   const users = (await db2.getUsers()).filter((u) => u.role === "customer");
   const orders = await db2.getOrders();
   const customerList = users.map((user) => {
     const userOrders = orders.filter((o) => o.customer.email.toLowerCase() === user.email.toLowerCase());
     const totalSpent = userOrders.reduce((acc, o) => acc + o.total, 0);
     return {
-      ...user,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.createdAt,
       orderCount: userOrders.length,
       totalSpent,
       lastOrderDate: userOrders[0]?.createdAt
@@ -677,7 +891,7 @@ async function startServer() {
     });
   }
   app.use((error, _req, res, _next) => {
-    console.error("\u274C Request failed:", error);
+    console.error("\u274C Request failed:", error instanceof Error ? error.name : "Unknown error");
     if (res.headersSent) {
       return;
     }
@@ -695,13 +909,10 @@ async function startServer() {
   });
 }
 startServer().then(() => {
-  void connectMongoDB().catch((error) => {
-    console.error(
-      "\u274C MongoDB connection failed; database-backed API requests will remain unavailable until MongoDB is reachable:",
-      error
-    );
+  void connectMongoDB().catch(() => {
+    console.error("\u274C MongoDB connection failed; database-backed API requests will remain unavailable.");
   });
 }).catch((error) => {
-  console.error("\u274C Server startup failed:", error);
+  console.error("\u274C Server startup failed:", error instanceof Error ? error.name : "Unknown error");
   process.exitCode = 1;
 });

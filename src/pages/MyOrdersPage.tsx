@@ -29,7 +29,7 @@ export const MyOrdersPage: React.FC = () => {
     async function loadOrders() {
       setLoading(true);
       try {
-        const data = await api.getOrders(user?.email);
+        const data = await api.getOrders();
         setOrders(data);
         if (data.length > 0) {
           setExpandedOrderId(data[0].id);
@@ -90,7 +90,7 @@ export const MyOrdersPage: React.FC = () => {
             Order History & Tracking
           </h1>
           <p className="text-xs text-[#6A7B74] mt-0.5">
-            {user ? `Orders for ${user.email}` : 'Track any order using your Order ID'}
+            {user ? `Orders for ${user.email}` : 'Sign in to view and track your orders'}
           </p>
         </div>
 
@@ -354,7 +354,7 @@ export const MyOrdersPage: React.FC = () => {
               <h3 className="font-serif text-lg font-bold">Cancel Order #{cancellingOrder.orderNumber}</h3>
             </div>
             <p className="text-xs text-[#52615D]">
-              Are you sure you want to cancel this order? If you paid online, a full refund will be processed back to your source account.
+              Only pending or confirmed orders can be cancelled. Online payments are not currently verified or refunded automatically.
             </p>
             <div>
               <label className="block text-xs font-semibold text-[#17372F] mb-1">

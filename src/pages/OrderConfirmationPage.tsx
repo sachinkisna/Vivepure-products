@@ -71,7 +71,7 @@ export const OrderConfirmationPage: React.FC = () => {
           Thank you for choosing VIVEPANYA!
         </h1>
         <p className="text-xs sm:text-sm text-[#52615D] mt-2 max-w-md mx-auto">
-          Your order has been recorded successfully. A confirmation message and tracking details have been logged for your account.
+          Your order has been recorded. View its latest status from your account.
         </p>
 
         <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 bg-white px-5 py-2.5 rounded-2xl border border-[#DBD5C5] text-xs">

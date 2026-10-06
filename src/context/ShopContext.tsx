@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, User } from '../types';
-import { getStoredUser, clearAuthSession } from '../services/api';
+import { api, clearAuthSession, getStoredToken } from '../services/api';
 
 interface ShopContextType {
   cart: CartItem[];
@@ -17,6 +17,7 @@ interface ShopContextType {
   applyCoupon: (code: string) => { success: boolean; message: string };
   removeCoupon: () => void;
   user: User | null;
+  authLoading: boolean;
   setUser: (user: User | null) => void;
   logout: () => void;
   activePage: string;
@@ -47,7 +48,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const [user, setUser] = useState<User | null>(() => getStoredUser());
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activePage, setActivePage] = useState<string>('home');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -63,6 +65,43 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Failed to sync cart to localStorage', e);
     }
   }, [cart]);
+
+  useEffect(() => {
+    let active = true;
+    if (!getStoredToken()) {
+      setAuthLoading(false);
+      return;
+    }
+
+    api.getCurrentUser()
+      .then(authenticatedUser => {
+        if (active) setUser(authenticatedUser);
+      })
+      .catch(() => {
+        clearAuthSession();
+        if (active) setUser(null);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      clearAuthSession();
+      setUser(null);
+      showToast('Your session expired. Please sign in again.');
+      if (activePage === 'admin' || activePage === 'orders' || activePage === 'checkout') {
+        setActivePage('home');
+      }
+    };
+    window.addEventListener('auth:expired', handleExpiredSession);
+    return () => window.removeEventListener('auth:expired', handleExpiredSession);
+  }, [activePage]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -184,6 +223,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         applyCoupon,
         removeCoupon,
         user,
+        authLoading,
         setUser,
         logout,
         activePage,

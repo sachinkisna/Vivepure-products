@@ -78,15 +78,13 @@ export const ProductDetailsPage: React.FC = () => {
     try {
       const newReview = await api.addReview({
         productId: product.id,
-        customerName: reviewName || 'Anonymous Customer',
-        customerEmail: reviewEmail,
         rating: reviewRating,
         comment: reviewComment,
       });
 
       setReviews(prev => [newReview, ...prev]);
       setReviewComment('');
-      showToast('Thank you! Your verified review has been submitted.');
+      showToast('Thank you! Your review has been submitted.');
     } catch (err) {
       showToast('Failed to submit review');
     } finally {

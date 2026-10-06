@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
-import { OrderItem } from '../types';
 import { ShieldCheck, Truck, CreditCard, Banknote, ArrowLeft, Check, Lock } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
@@ -32,9 +31,7 @@ export const CheckoutPage: React.FC = () => {
     pincode: '',
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'Cash on Delivery' | 'Online Payment'>('Online Payment');
-  const [onlineGatewayType, setOnlineGatewayType] = useState<'upi' | 'card' | 'netbanking'>('upi');
-  const [upiId, setUpiId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash on Delivery' | 'Online Payment'>('Cash on Delivery');
 
   if (cart.length === 0) {
     return (
@@ -60,21 +57,12 @@ export const CheckoutPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const orderItems: OrderItem[] = cart.map(item => ({
+      const orderItems = cart.map(item => ({
         productId: item.product.id,
-        name: item.product.name,
-        price: item.product.discountPrice || item.product.price,
         quantity: item.quantity,
-        image: item.product.images[0] || '',
       }));
 
       const orderPayload = {
-        customer: {
-          userId: user?.id,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-        },
         deliveryAddress: {
           name: formData.name,
           phone: formData.phone,
@@ -85,10 +73,6 @@ export const CheckoutPage: React.FC = () => {
           pincode: formData.pincode,
         },
         items: orderItems,
-        subtotal: cartSubtotal,
-        deliveryCharges,
-        discount: discountAmount,
-        total: cartTotal,
         couponCode: appliedCoupon || undefined,
         paymentMethod,
       };
@@ -112,7 +96,7 @@ export const CheckoutPage: React.FC = () => {
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#17372F]">Checkout</h1>
           <p className="text-xs text-[#6A7B74] mt-0.5">
-            Safe, encrypted checkout with instant order confirmation
+            Your order details and stock are checked by the server before confirmation.
           </p>
         </div>
         <button
@@ -281,60 +265,15 @@ export const CheckoutPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[#17372F] flex items-center gap-1.5">
                       <CreditCard className="w-3.5 h-3.5 text-[#173F35]" />
-                      <span>Online Payment (UPI, Credit/Debit Card, NetBanking)</span>
+                      <span>Online Payment</span>
                     </span>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200">
-                      Recommended
+                    <span className="text-[10px] bg-amber-50 text-amber-800 font-bold px-2 py-0.5 rounded border border-amber-200">
+                      Gateway not connected
                     </span>
                   </div>
                   <p className="text-[11px] text-[#6A7B74] mt-1">
-                    Instant automated verification. Supported via Google Pay, PhonePe, Paytm, and all Indian banks.
+                    No online payment will be collected here. The order will remain unpaid until a payment gateway is integrated and verified by the server.
                   </p>
-
-                  {paymentMethod === 'Online Payment' && (
-                    <div className="mt-3 pt-3 border-t border-[#E7E2D6] space-y-2">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setOnlineGatewayType('upi')}
-                          className={`px-3 py-1 text-[11px] font-semibold rounded-lg border cursor-pointer ${
-                            onlineGatewayType === 'upi'
-                              ? 'bg-[#173F35] text-white border-[#173F35]'
-                              : 'bg-white text-[#52615D] border-[#DBD5C5]'
-                          }`}
-                        >
-                          UPI (GPay / PhonePe / Paytm)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOnlineGatewayType('card')}
-                          className={`px-3 py-1 text-[11px] font-semibold rounded-lg border cursor-pointer ${
-                            onlineGatewayType === 'card'
-                              ? 'bg-[#173F35] text-white border-[#173F35]'
-                              : 'bg-white text-[#52615D] border-[#DBD5C5]'
-                          }`}
-                        >
-                          Credit / Debit Card
-                        </button>
-                      </div>
-
-                      {onlineGatewayType === 'upi' ? (
-                        <div className="flex gap-2 items-center pt-1">
-                          <input
-                            type="text"
-                            value={upiId}
-                            onChange={(e) => setUpiId(e.target.value)}
-                            placeholder="username@upi (Optional - fast demo verify)"
-                            className="w-full bg-white border border-[#DBD5C5] rounded-lg py-1.5 px-3 text-xs text-[#1E2E2A]"
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-[#6A7B74] pt-1">
-                          Instant card simulation: 128-bit SSL encrypted transaction with OTP authentication.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
               </label>
 

@@ -20,13 +20,36 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { CheckCircle2 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { activePage, toastMessage } = useShop();
+  const { activePage, toastMessage, user, authLoading, setActivePage, showToast } = useShop();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  const openAuth = (mode: 'login' | 'register' = 'login') => {
+    setAuthMode(mode);
+    setAuthModalOpen(true);
+  };
+
+  React.useEffect(() => {
+    if (authLoading) return;
+    const customerPages = ['orders', 'checkout', 'order-confirmation'];
+
+    if (activePage === 'admin' && user?.role !== 'admin') {
+      setActivePage('home');
+      if (!user) setAuthModalOpen(true);
+      else showToast('Administrator access is required.');
+      return;
+    }
+
+    if (customerPages.includes(activePage) && !user) {
+      setActivePage('home');
+      setAuthModalOpen(true);
+    }
+  }, [activePage, authLoading, setActivePage, showToast, user]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1E2E2A] selection:bg-[#173F35] selection:text-white">
       {/* Navigation Header */}
-      <Navbar onOpenAuth={() => setAuthModalOpen(true)} />
+      <Navbar onOpenAuth={openAuth} />
 
       {/* Main Page Content */}
       <main className="flex-1">
@@ -45,12 +68,13 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer onOpenAuth={openAuth} />
 
       {/* Auth Modal (Login / Register / Demo) */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        defaultMode={authMode}
       />
 
       {/* Toast Notification Container */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
 import { ViveLogo } from './ViveLogo';
@@ -26,30 +26,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
-  if (!isOpen) return null;
-
-  const handleQuickDemo = async (role: 'customer' | 'admin') => {
-    setError(null);
-    setLoading(true);
-    try {
-      if (role === 'admin') {
-        const res = await api.login('admin@vivepanya.com', 'admin123');
-        setUser(res.user);
-        showToast('Logged in as Administrator');
-        onClose();
-        setActivePage('admin');
-      } else {
-        const res = await api.login('customer@vivepanya.com', 'password123');
-        setUser(res.user);
-        showToast(`Welcome back, ${res.user.name}!`);
-        onClose();
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Login failed');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (isOpen) {
+      setMode(defaultMode);
+      setError(null);
     }
-  };
+  }, [defaultMode, isOpen]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,6 +188,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <input
                 type="password"
                 required
+                minLength={mode === 'register' ? 8 : undefined}
+                maxLength={72}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -221,30 +207,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </form>
 
-        {/* Quick Demo Access Bar */}
-        <div className="mt-5 pt-4 border-t border-[#E7E2D6]">
-          <p className="text-[11px] font-semibold text-center text-[#7A8A84] uppercase tracking-wider mb-2.5">
-            Quick 1-Click Evaluation Logins
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('customer')}
-              disabled={loading}
-              className="py-1.5 px-2 bg-white border border-[#DBD5C5] rounded-lg text-[11px] font-medium text-[#1E2E2A] hover:bg-[#F2EEE4] text-center transition-colors cursor-pointer"
-            >
-              👤 Customer Demo
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('admin')}
-              disabled={loading}
-              className="py-1.5 px-2 bg-[#173F35]/10 border border-[#173F35]/30 rounded-lg text-[11px] font-semibold text-[#173F35] hover:bg-[#173F35]/20 text-center transition-colors cursor-pointer"
-            >
-              🛡️ Admin Demo
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

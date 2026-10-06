@@ -36,6 +36,14 @@ export async function connectMongoDB(): Promise<Db> {
   await client.connect();
 
   db = client.db('vivepanya');
+  await db.collection('users').createIndex(
+    { email: 1 },
+    {
+      unique: true,
+      collation: { locale: 'en', strength: 2 },
+      name: 'users_email_case_insensitive_unique',
+    }
+  );
 
   console.log('✅ Connected to MongoDB Atlas');
 
@@ -48,4 +56,8 @@ export async function getMongoDB(): Promise<Db> {
   }
 
   return connectMongoDB();
+}
+
+export function getMongoClient(): MongoClient {
+  return client;
 }

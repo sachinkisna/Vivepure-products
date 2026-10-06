@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { ViveLogo } from './ViveLogo';
 import { useShop } from '../context/ShopContext';
-import { ShoppingBag, Search, User as UserIcon, Shield, Menu, X, BookOpen } from 'lucide-react';
+import { ShoppingBag, Search, User as UserIcon, Menu, X } from 'lucide-react';
 
-export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => {
+type AuthMode = 'login' | 'register';
+
+export const Navbar: React.FC<{ onOpenAuth: (mode?: AuthMode) => void }> = ({ onOpenAuth }) => {
   const {
     activePage,
     setActivePage,
@@ -147,34 +149,6 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
               <Search className="w-5 h-5" />
             </button>
 
-            {/* Setup & Deployment Guide Button */}
-            <button
-              onClick={() => handleNavClick('guide')}
-              title="Full Stack & MongoDB Setup Guide"
-              className={`hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                activePage === 'guide'
-                  ? 'bg-[#EAF2EC] text-[#173F35] border-[#173F35]/30'
-                  : 'border-[#DBD5C5] text-[#4A5D56] hover:bg-white'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-[#173F35]" />
-              <span>Setup Guide</span>
-            </button>
-
-            {/* Admin Portal Toggle */}
-            <button
-              onClick={() => handleNavClick('admin')}
-              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                activePage === 'admin'
-                  ? 'bg-[#173F35] text-white border-[#173F35]'
-                  : 'border-[#DBD5C5] text-[#2C4039] hover:bg-[#EAF2EC] hover:text-[#173F35]'
-              }`}
-              title="Admin & Seller Management Dashboard"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
-
             {/* User Account / Auth */}
             {user ? (
               <div className="relative group">
@@ -196,14 +170,6 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
                   >
                     My Orders
                   </button>
-                  {user.role === 'admin' && (
-                    <button
-                      onClick={() => handleNavClick('admin')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer"
-                    >
-                      Admin Dashboard
-                    </button>
-                  )}
                   <button
                     onClick={logout}
                     className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
@@ -213,13 +179,21 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
                 </div>
               </div>
             ) : (
-              <button
-                onClick={onOpenAuth}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-white border border-[#DBD5C5] text-[#1E2E2A] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
-              >
-                <UserIcon className="w-3.5 h-3.5 text-[#173F35]" />
-                <span>Login</span>
-              </button>
+              <>
+                <button
+                  onClick={() => onOpenAuth('login')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-white border border-[#DBD5C5] text-[#1E2E2A] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-[#173F35]" />
+                  <span>Login</span>
+                </button>
+                <button
+                  onClick={() => onOpenAuth('register')}
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-[#173F35] text-white hover:bg-[#235D4E] transition-colors cursor-pointer"
+                >
+                  Register
+                </button>
+              </>
             )}
 
             {/* Shopping Cart Button with Counter */}
@@ -321,18 +295,22 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
           >
             Contact Us
           </button>
-          <button
-            onClick={() => handleNavClick('guide')}
-            className="block w-full text-left py-2 text-sm font-medium text-[#173F35]"
-          >
-            Full Stack & MongoDB Setup Guide
-          </button>
-          <button
-            onClick={() => handleNavClick('admin')}
-            className="block w-full text-left py-2 text-sm font-medium text-[#B9944A]"
-          >
-            Seller / Admin Dashboard
-          </button>
+          {!user && (
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => { onOpenAuth('login'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 rounded-lg border border-[#DBD5C5] text-sm font-semibold text-[#173F35]"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => { onOpenAuth('register'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 rounded-lg bg-[#173F35] text-sm font-semibold text-white"
+              >
+                Register
+              </button>
+            </div>
+          )}
         </div>
       )}
     </header>

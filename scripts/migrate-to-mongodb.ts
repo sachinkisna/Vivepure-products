@@ -2,6 +2,7 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { MongoClient } from 'mongodb';
+import bcrypt from 'bcryptjs';
 
 const uri = process.env.MONGODB_URI;
 
@@ -28,6 +29,19 @@ async function migrate() {
 
   const rawData = fs.readFileSync(DATA_FILE, 'utf-8');
   const data = JSON.parse(rawData);
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (
+    !adminEmail ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail) ||
+    !adminPassword ||
+    adminPassword.length < 8 ||
+    Buffer.byteLength(adminPassword, 'utf8') > 72
+  ) {
+    throw new Error('Set a valid ADMIN_EMAIL and ADMIN_PASSWORD before migrating admin credentials.');
+  }
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
 
   const client = new MongoClient(mongoUri);
 
@@ -71,13 +85,15 @@ async function migrate() {
       await db.collection('reviews').insertMany(data.reviews);
     }
 
-    // Store admin password hash separately
-if (data.adminPasswordHash) {
-  await db.collection<{ _id: string; adminPasswordHash: string }>('settings').insertOne({
-    _id: 'admin',
-    adminPasswordHash: data.adminPasswordHash,
-  });
-}
+    await db.collection<{
+      _id: string;
+      adminEmail: string;
+      adminPasswordHash: string;
+    }>('settings').insertOne({
+      _id: 'admin',
+      adminEmail,
+      adminPasswordHash,
+    });
 
     console.log('');
     console.log('✅ Migration completed successfully!');
@@ -86,7 +102,7 @@ if (data.adminPasswordHash) {
     console.log(`🏷️ Categories: ${data.categories?.length ?? 0}`);
     console.log(`🛒 Orders: ${data.orders?.length ?? 0}`);
     console.log(`⭐ Reviews: ${data.reviews?.length ?? 0}`);
-    console.log(`🔐 Admin settings: ${data.adminPasswordHash ? 1 : 0}`);
+    console.log(`🔐 Admin settings: ${adminPasswordHash ? 1 : 0}`);
     console.log('');
     console.log('🎉 Data is now in MongoDB Atlas.');
   } finally {
@@ -94,7 +110,7 @@ if (data.adminPasswordHash) {
   }
 }
 
-migrate().catch((error) => {
-  console.error('❌ Migration failed:', error);
+migrate().catch(() => {
+  console.error('❌ Migration failed. Check the migration configuration and MongoDB connectivity.');
   process.exit(1);
 });

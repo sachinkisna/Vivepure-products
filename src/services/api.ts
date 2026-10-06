@@ -1,26 +1,27 @@
-import { Product, Category, Order, Review, User, AdminStats } from '../types';
+import {
+  Product,
+  Category,
+  Order,
+  Review,
+  User,
+  AdminStats,
+  CreateOrderRequest,
+  CustomerSummary,
+} from '../types';
 import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_REVIEWS } from '../data/initialData';
 
 const TOKEN_KEY = 'vivepanya_token';
-const USER_KEY = 'vivepanya_user';
 
 export const getStoredToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
 };
 
-export const getStoredUser = (): User | null => {
-  const data = localStorage.getItem(USER_KEY);
-  return data ? JSON.parse(data) : null;
-};
-
-export const saveAuthSession = (token: string, user: User) => {
+export const saveAuthSession = (token: string) => {
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 export const clearAuthSession = () => {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
 };
 
 // Common fetch helper with authorization headers
@@ -42,6 +43,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     });
 
     if (!res.ok) {
+      if (
+        res.status === 401 &&
+        token &&
+        endpoint !== '/api/auth/login' &&
+        endpoint !== '/api/auth/register'
+      ) {
+        clearAuthSession();
+        window.dispatchEvent(new Event('auth:expired'));
+      }
       const errData = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(errData.error || `HTTP error ${res.status}`);
     }
@@ -175,19 +185,15 @@ export const api = {
   },
 
   // --- Orders ---
-  async createOrder(orderData: any): Promise<Order> {
+  async createOrder(orderData: CreateOrderRequest): Promise<Order> {
     return await request<Order>('/api/orders', {
       method: 'POST',
       body: JSON.stringify(orderData),
     });
   },
 
-  async getOrders(email?: string, isAdmin?: boolean): Promise<Order[]> {
-    const query = new URLSearchParams();
-    if (email) query.set('email', email);
-    if (isAdmin) query.set('admin', 'true');
-    const qs = query.toString();
-    return await request<Order[]>(`/api/orders${qs ? `?${qs}` : ''}`);
+  async getOrders(): Promise<Order[]> {
+    return await request<Order[]>('/api/orders');
   },
 
   async getOrderById(id: string): Promise<Order> {
@@ -219,8 +225,6 @@ export const api = {
 
   async addReview(reviewData: {
     productId: string;
-    customerName: string;
-    customerEmail?: string;
     rating: number;
     comment: string;
   }): Promise<Review> {
@@ -236,8 +240,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    saveAuthSession(res.token, res.user);
+    saveAuthSession(res.token);
     return res;
+  },
+
+  async getCurrentUser(): Promise<User> {
+    const result = await request<{ user: User }>('/api/auth/me');
+    return result.user;
   },
 
   async register(name: string, email: string, password: string, phone?: string): Promise<{ user: User; token: string }> {
@@ -245,7 +254,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, email, password, phone }),
     });
-    saveAuthSession(res.token, res.user);
+    saveAuthSession(res.token);
     return res;
   },
 
@@ -254,7 +263,7 @@ export const api = {
     return await request<AdminStats>('/api/admin/stats');
   },
 
-  async getCustomers(): Promise<any[]> {
-    return await request<any[]>('/api/admin/customers');
+  async getCustomers(): Promise<CustomerSummary[]> {
+    return await request<CustomerSummary[]>('/api/admin/customers');
   },
 };

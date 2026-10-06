@@ -37,7 +37,7 @@ export const AdminDashboard: React.FC = () => {
       const [statsData, prods, ords, cats, custs] = await Promise.all([
         api.getAdminStats(),
         api.getProducts(),
-        api.getOrders(undefined, true),
+        api.getOrders(),
         api.getCategories(),
         api.getCustomers(),
       ]);
