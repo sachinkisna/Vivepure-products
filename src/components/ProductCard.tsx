@@ -9,7 +9,7 @@ const bundledImages = import.meta.glob<string>('../assets/images/*', {
   import: 'default',
 });
 
-const resolveProductImage = (imagePath: string): string => {
+export const resolveProductImage = (imagePath: string): string => {
   const localImagePrefix = '/src/assets/images/';
   if (!imagePath.startsWith(localImagePrefix)) {
     return imagePath;

@@ -3,6 +3,7 @@ import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
 import { Product, Review } from '../types';
 import { ProductCard } from '../components/ProductCard';
+import { resolveProductImage } from '../components/ProductCard';
 import { Star, ShoppingBag, Zap, Check, ArrowLeft, ShieldCheck, Truck, RefreshCw, Send, User } from 'lucide-react';
 
 export const ProductDetailsPage: React.FC = () => {
@@ -117,7 +118,7 @@ export const ProductDetailsPage: React.FC = () => {
         <div className="lg:col-span-6 space-y-4">
           <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-[#F2EEE4] border border-[#E7E2D6] shadow-sm">
             <img
-              src={product.images[activeImageIndex] || product.images[0]}
+              src={resolveProductImage(product.images[activeImageIndex] || product.images[0])}
               alt={product.name}
               className="w-full h-full object-cover"
             />
@@ -133,7 +134,7 @@ export const ProductDetailsPage: React.FC = () => {
                     activeImageIndex === idx ? 'border-[#173F35] shadow-sm' : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveProductImage(img)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
