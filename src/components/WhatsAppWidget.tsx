@@ -79,7 +79,7 @@ export const WhatsAppWidget: React.FC = () => {
             <button
               type="submit"
               aria-label="Send message on WhatsApp"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white transition-colors hover:bg-[#1FB85A]"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#173F35] text-white transition-colors hover:bg-[#235D4E]"
             >
               <Send className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -93,10 +93,9 @@ export const WhatsAppWidget: React.FC = () => {
         aria-label={isOpen ? 'Close WhatsApp chat' : 'Open WhatsApp chat'}
         aria-expanded={isOpen}
         aria-controls="whatsapp-chat-panel"
-        className="group flex h-14 items-center gap-2.5 rounded-full bg-[#25D366] px-4 text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-[#1FB85A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F35] sm:h-15 sm:px-5"
+        className="group flex h-14 w-14 items-center justify-center rounded-full bg-[#173F35] text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-[#235D4E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B9944A] sm:h-15 sm:w-15"
       >
         {isOpen ? <X className="h-6 w-6" aria-hidden="true" /> : <MessageCircle className="h-6 w-6" aria-hidden="true" />}
-        <span className="text-xs font-bold sm:text-sm">Chat with us</span>
       </button>
     </div>
   );
