@@ -1,5 +1,6 @@
 import React from 'react';
 import { ViveLogo } from '../components/ViveLogo';
+import { resolveProductImage } from '../components/ProductCard';
 import { useShop } from '../context/ShopContext';
 import { ShieldCheck, Sparkles, HeartHandshake, Leaf, ArrowRight, Award, Compass, Users } from 'lucide-react';
 
@@ -61,8 +62,9 @@ export const AboutUsPage: React.FC = () => {
           <div className="lg:col-span-6">
             <div className="relative rounded-3xl overflow-hidden shadow-xl aspect-[4/3] bg-[#EAE5D8] border border-[#DBD5C5]">
               <img
-                src="/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
+                src={resolveProductImage('/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg')}
                 alt="VIVEPANYA Workshop and Botanical Ingredients"
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
             </div>

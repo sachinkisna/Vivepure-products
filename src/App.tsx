@@ -3,6 +3,7 @@ import { ShopProvider, useShop } from './context/ShopContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
+import { WhatsAppWidget } from './components/WhatsAppWidget';
 
 // Pages
 import { HomePage } from './pages/HomePage';
@@ -69,6 +70,9 @@ const AppContent: React.FC = () => {
 
       {/* Footer */}
       <Footer onOpenAuth={openAuth} />
+
+      {/* WhatsApp Support */}
+      <WhatsAppWidget />
 
       {/* Auth Modal (Login / Register / Demo) */}
       <AuthModal
