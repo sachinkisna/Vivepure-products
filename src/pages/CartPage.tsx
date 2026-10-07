@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useShop } from '../context/ShopContext';
+import { resolveProductImage } from '../components/ProductCard';
 import { Trash2, Plus, Minus, ArrowRight, ArrowLeft, ShoppingBag, Tag, Check, Sparkles } from 'lucide-react';
 
 export const CartPage: React.FC = () => {
@@ -92,8 +93,9 @@ export const CartPage: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-[#F2EEE4] shrink-0">
                     <img
-                      src={product.images[0]}
+                      src={resolveProductImage(product.images[0])}
                       alt={product.name}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />
                   </div>

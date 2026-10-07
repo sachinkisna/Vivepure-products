@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
+import { resolveProductImage } from '../components/ProductCard';
 import { ShieldCheck, Truck, CreditCard, Banknote, ArrowLeft, Check, Lock } from 'lucide-react';
 
 export const CheckoutPage: React.FC = () => {
@@ -320,8 +321,9 @@ export const CheckoutPage: React.FC = () => {
                 <div key={product.id} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-3">
                     <img
-                      src={product.images[0]}
+                      src={resolveProductImage(product.images[0])}
                       alt=""
+                      referrerPolicy="no-referrer"
                       className="w-11 h-11 rounded-lg object-cover bg-[#F2EEE4]"
                     />
                     <div>
