@@ -115,7 +115,10 @@ var Database = class {
   // =========================
   async getProducts() {
     const db3 = await getMongoDB();
-    return db3.collection("products").find({}).toArray();
+    const products = await db3.collection("products").find({}).toArray();
+    const reviews = await db3.collection("reviews").find({ $or: [{ status: "approved" }, { status: { $exists: false } }] }).toArray();
+    const reviewStats = this.getReviewStats(reviews);
+    return products.map((product) => this.withReviewStats(product, reviewStats.get(product.id)));
   }
   async getProductById(id) {
     const db3 = await getMongoDB();
@@ -125,7 +128,12 @@ var Database = class {
         { slug: id }
       ]
     });
-    return product ?? void 0;
+    if (!product) return void 0;
+    const reviews = await db3.collection("reviews").find({
+      productId: product.id,
+      $or: [{ status: "approved" }, { status: { $exists: false } }]
+    }).toArray();
+    return this.withReviewStats(product, reviews);
   }
   async createProduct(product) {
     const db3 = await getMongoDB();
@@ -135,16 +143,21 @@ var Database = class {
   }
   async updateProduct(id, updates) {
     const db3 = await getMongoDB();
+    const { _id: _mongoId, ...safeUpdates } = updates;
     const result = await db3.collection("products").findOneAndUpdate(
       { id },
-      { $set: updates },
+      { $set: safeUpdates },
       { returnDocument: "after" }
     );
     if (!result) {
       return null;
     }
     await this.updateCategoryCounts();
-    return result;
+    const reviews = await db3.collection("reviews").find({
+      productId: result.id,
+      $or: [{ status: "approved" }, { status: { $exists: false } }]
+    }).toArray();
+    return this.withReviewStats(result, reviews);
   }
   async deleteProduct(id) {
     const db3 = await getMongoDB();
@@ -328,23 +341,46 @@ var Database = class {
   // =========================
   async getReviewsForProduct(productId) {
     const db3 = await getMongoDB();
-    return db3.collection("reviews").find({ productId }).sort({ createdAt: -1 }).toArray();
+    return db3.collection("reviews").find({
+      productId,
+      $or: [{ status: "approved" }, { status: { $exists: false } }]
+    }).sort({ createdAt: -1 }).toArray();
+  }
+  async getReviewsForAdmin() {
+    const db3 = await getMongoDB();
+    return db3.collection("reviews").find({}).sort({ createdAt: -1 }).toArray();
   }
   async addReview(review) {
     const db3 = await getMongoDB();
     await db3.collection("reviews").insertOne(review);
-    const productReviews = await db3.collection("reviews").find({ productId: review.productId }).toArray();
-    const averageRating = productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length;
-    await db3.collection("products").updateOne(
-      { id: review.productId },
-      {
-        $set: {
-          rating: Number(averageRating.toFixed(1)),
-          reviewCount: productReviews.length
-        }
-      }
+    return review;
+  }
+  async moderateReview(id, status) {
+    const db3 = await getMongoDB();
+    const review = await db3.collection("reviews").findOneAndUpdate(
+      { id },
+      { $set: { status } },
+      { returnDocument: "after" }
     );
     return review;
+  }
+  getReviewStats(reviews) {
+    const stats = /* @__PURE__ */ new Map();
+    for (const review of reviews) {
+      const productReviews = stats.get(review.productId) ?? [];
+      productReviews.push(review);
+      stats.set(review.productId, productReviews);
+    }
+    return stats;
+  }
+  withReviewStats(product, reviews) {
+    const approvedReviews = reviews ?? [];
+    const rating = approvedReviews.length ? approvedReviews.reduce((total, review) => total + review.rating, 0) / approvedReviews.length : 0;
+    return {
+      ...product,
+      rating: Number(rating.toFixed(1)),
+      reviewCount: approvedReviews.length
+    };
   }
   // =========================
   // Admin Stats
@@ -606,7 +642,7 @@ app.get("/api/products/:id", asyncHandler(async (req, res) => {
   res.json(product);
 }));
 app.post("/api/products", requireAdmin, asyncHandler(async (req, res) => {
-  const { name, category, price, discountPrice, description, stock, images, benefits, ingredients, weight } = req.body;
+  const { name, category, price, discountPrice, description, stock, images, benefits, ingredients, usage, weight } = req.body;
   if (!name || !price || !category) {
     return res.status(400).json({ error: "Product name, category and price are required" });
   }
@@ -621,6 +657,7 @@ app.post("/api/products", requireAdmin, asyncHandler(async (req, res) => {
     description: description || "",
     benefits: Array.isArray(benefits) ? benefits : [],
     ingredients: Array.isArray(ingredients) ? ingredients : [],
+    usage: typeof usage === "string" ? usage : "",
     stock: Number(stock) || 0,
     images: images && images.length ? images : ["/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"],
     rating: 5,
@@ -641,6 +678,80 @@ app.put("/api/products/:id", requireAdmin, asyncHandler(async (req, res) => {
   }
   res.json(updated);
 }));
+app.post(
+  "/api/admin/product-images",
+  ...requireAdmin,
+  express.raw({
+    type: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"],
+    limit: "10mb"
+  }),
+  asyncHandler(async (req, res) => {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY?.trim();
+    if (!privateKey) {
+      return res.status(503).json({ error: "Image uploads are not configured on the server." });
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: "Select a valid image file to upload." });
+    }
+    const contentType = req.header("Content-Type") ?? "";
+    const allowedTypes = /* @__PURE__ */ new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/avif"
+    ]);
+    if (!allowedTypes.has(contentType)) {
+      return res.status(415).json({ error: "Upload a JPEG, PNG, WebP, GIF, or AVIF image." });
+    }
+    const encodedName = req.header("X-File-Name");
+    if (!encodedName) {
+      return res.status(400).json({ error: "Image filename is required." });
+    }
+    let originalName;
+    try {
+      originalName = decodeURIComponent(encodedName);
+    } catch {
+      return res.status(400).json({ error: "Image filename is invalid." });
+    }
+    const fileName = originalName.split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+    if (!fileName) {
+      return res.status(400).json({ error: "Image filename is invalid." });
+    }
+    const form = new FormData();
+    const imageBytes = new ArrayBuffer(req.body.length);
+    new Uint8Array(imageBytes).set(req.body);
+    form.append("file", new Blob([imageBytes], { type: contentType }), fileName);
+    form.append("fileName", fileName);
+    form.append("folder", "/vivepanya/products");
+    form.append("useUniqueFileName", "true");
+    let imageKitResponse;
+    try {
+      imageKitResponse = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString("base64")}`,
+          Accept: "application/json"
+        },
+        body: form
+      });
+    } catch (error) {
+      console.error("ImageKit upload request failed:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(502).json({ error: "Image upload provider is unavailable. Please try again." });
+    }
+    const result = await imageKitResponse.json().catch(() => null);
+    if (!imageKitResponse.ok || typeof result?.url !== "string") {
+      console.error(`ImageKit upload failed with HTTP ${imageKitResponse.status}.`);
+      return res.status(502).json({
+        error: typeof result?.message === "string" ? result.message : "Image upload failed. Please try again."
+      });
+    }
+    res.status(201).json({
+      url: result.url,
+      name: typeof result.name === "string" ? result.name : fileName
+    });
+  })
+);
 app.delete("/api/products/:id", requireAdmin, asyncHandler(async (req, res) => {
   const deleted = await db2.deleteProduct(req.params.id);
   if (!deleted) {
@@ -829,6 +940,18 @@ app.put("/api/orders/:id/cancel", requireAuth, asyncHandler(async (req, res) => 
 app.get("/api/reviews/:productId", asyncHandler(async (req, res) => {
   res.json(await db2.getReviewsForProduct(req.params.productId));
 }));
+app.get("/api/admin/reviews", requireAdmin, asyncHandler(async (_req, res) => {
+  res.json(await db2.getReviewsForAdmin());
+}));
+app.put("/api/admin/reviews/:id/status", requireAdmin, asyncHandler(async (req, res) => {
+  const status = req.body?.status;
+  if (status !== "approved" && status !== "rejected") {
+    return res.status(400).json({ error: "Review status must be approved or rejected." });
+  }
+  const review = await db2.moderateReview(req.params.id, status);
+  if (!review) return res.status(404).json({ error: "Review not found." });
+  res.json(review);
+}));
 app.post("/api/reviews", requireCustomer, asyncHandler(async (req, res) => {
   const user = req.user;
   const { productId, rating, comment } = req.body ?? {};
@@ -846,7 +969,8 @@ app.post("/api/reviews", requireCustomer, asyncHandler(async (req, res) => {
     rating,
     comment: comment.trim(),
     verifiedPurchase: await db2.hasVerifiedPurchase(user.id, user.email, productId),
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    status: "pending"
   };
   const saved = await db2.addReview(review);
   res.status(201).json(saved);
@@ -896,8 +1020,9 @@ async function startServer() {
       return;
     }
     const databaseUnavailable = error instanceof Error && ["MongoNetworkError", "MongoServerSelectionError"].includes(error.name);
-    res.status(databaseUnavailable ? 503 : 500).json({
-      error: databaseUnavailable ? "Database is currently unavailable" : "Internal server error"
+    const oversizedUpload = error instanceof Error && "type" in error && error.type === "entity.too.large";
+    res.status(oversizedUpload ? 413 : databaseUnavailable ? 503 : 500).json({
+      error: oversizedUpload ? "Image exceeds the 10 MB upload limit." : databaseUnavailable ? "Database is currently unavailable" : "Internal server error"
     });
   });
   await new Promise((resolve, reject) => {

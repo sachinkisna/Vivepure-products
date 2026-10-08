@@ -19,15 +19,79 @@ import { ContactUsPage } from './pages/ContactUsPage';
 import { SetupGuidePage } from './pages/SetupGuidePage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { CheckCircle2 } from 'lucide-react';
+import { FeaturedProductPopup } from './components/FeaturedProductPopup';
+import { api } from './services/api';
 
 const AppContent: React.FC = () => {
-  const { activePage, toastMessage, user, authLoading, setActivePage, showToast } = useShop();
+  const {
+    activePage,
+    toastMessage,
+    user,
+    authLoading,
+    setActivePage,
+    setSelectedProductId,
+    setSelectedCategory,
+    setSearchQuery,
+    showToast,
+  } = useShop();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [featuredPopupOpen, setFeaturedPopupOpen] = useState(false);
 
   const openAuth = (mode: 'login' | 'register' = 'login') => {
     setAuthMode(mode);
     setAuthModalOpen(true);
+  };
+
+  React.useEffect(() => {
+    if (authLoading || authModalOpen || activePage === 'admin') return;
+
+    let popupAlreadyShown = false;
+    try {
+      popupAlreadyShown = sessionStorage.getItem('vivepanya-featured-product-popup') === 'shown';
+    } catch (error) {
+      console.warn('Could not read featured popup session state:', error);
+    }
+    if (popupAlreadyShown) return;
+
+    const timer = window.setTimeout(() => {
+      setFeaturedPopupOpen(true);
+      try {
+        sessionStorage.setItem('vivepanya-featured-product-popup', 'shown');
+      } catch (error) {
+        console.warn('Could not save featured popup session state:', error);
+      }
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [activePage, authLoading, authModalOpen]);
+
+  const exploreFeaturedProduct = async () => {
+    setFeaturedPopupOpen(false);
+
+    try {
+      const products = await api.getProducts();
+      const featuredProduct = products.find(product => {
+        const name = product.name.toLowerCase();
+        return name.includes('vivepure anti-tan herbal soap') ||
+          name.includes('vivepure anti tan herbal soap');
+      });
+
+      if (featuredProduct) {
+        setSelectedProductId(featuredProduct.id);
+        setActivePage('product-details');
+      } else {
+        setSearchQuery('');
+        setSelectedCategory('Special Care & Detox');
+        setActivePage('shop');
+      }
+    } catch (error) {
+      console.error('Failed to find the featured tan-care product:', error);
+      setSearchQuery('');
+      setSelectedCategory('Special Care & Detox');
+      setActivePage('shop');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   React.useEffect(() => {
@@ -80,6 +144,13 @@ const AppContent: React.FC = () => {
         onClose={() => setAuthModalOpen(false)}
         defaultMode={authMode}
       />
+
+      {featuredPopupOpen && (
+        <FeaturedProductPopup
+          onClose={() => setFeaturedPopupOpen(false)}
+          onExplore={exploreFeaturedProduct}
+        />
+      )}
 
       {/* Toast Notification Container */}
       {toastMessage && (
