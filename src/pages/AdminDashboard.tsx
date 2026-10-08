@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
-  const { user, showToast, setActivePage } = useShop();
+  const { user, showToast, setActivePage, adminDashboardTab, setAdminDashboardTab } = useShop();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'categories' | 'customers'>('overview');
+  const [activeTab, setActiveTab] = useState(adminDashboardTab);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,6 +27,15 @@ export const AdminDashboard: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+
+  useEffect(() => {
+    setActiveTab(adminDashboardTab);
+  }, [adminDashboardTab]);
+
+  const selectAdminTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setAdminDashboardTab(tab);
+  };
 
   // Filter in admin
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
@@ -222,7 +231,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="flex border-b border-[#E7E2D6] gap-4 sm:gap-8 text-xs sm:text-sm font-semibold overflow-x-auto pb-px">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => selectAdminTab('overview')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'overview'
               ? 'border-[#173F35] text-[#173F35]'
@@ -232,7 +241,7 @@ export const AdminDashboard: React.FC = () => {
           Dashboard Overview
         </button>
         <button
-          onClick={() => setActiveTab('products')}
+          onClick={() => selectAdminTab('products')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeTab === 'products'
               ? 'border-[#173F35] text-[#173F35]'
@@ -245,7 +254,7 @@ export const AdminDashboard: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('orders')}
+          onClick={() => selectAdminTab('orders')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeTab === 'orders'
               ? 'border-[#173F35] text-[#173F35]'
@@ -258,7 +267,7 @@ export const AdminDashboard: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('categories')}
+          onClick={() => selectAdminTab('categories')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'categories'
               ? 'border-[#173F35] text-[#173F35]'
@@ -268,7 +277,7 @@ export const AdminDashboard: React.FC = () => {
           Categories ({categories.length})
         </button>
         <button
-          onClick={() => setActiveTab('customers')}
+          onClick={() => selectAdminTab('customers')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'customers'
               ? 'border-[#173F35] text-[#173F35]'
@@ -375,7 +384,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="font-serif text-xl font-bold text-[#17372F]">Recent Orders</h2>
               <button
-                onClick={() => setActiveTab('orders')}
+                onClick={() => selectAdminTab('orders')}
                 className="text-xs font-semibold text-[#173F35] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View All ({orders.length})</span>
@@ -402,7 +411,7 @@ export const AdminDashboard: React.FC = () => {
                     <button
                       onClick={() => {
                         setSelectedOrderDetails(order);
-                        setActiveTab('orders');
+                        selectAdminTab('orders');
                       }}
                       className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#FAF8F5] border border-[#DBD5C5] text-[#173F35] hover:bg-[#EAF2EC] cursor-pointer"
                     >

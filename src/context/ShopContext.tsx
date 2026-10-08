@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, User } from '../types';
 import { api, clearAuthSession, getStoredToken } from '../services/api';
 
+export type AdminDashboardTab = 'overview' | 'products' | 'orders' | 'categories' | 'customers';
+
 interface ShopContextType {
   cart: CartItem[];
   addToCart: (product: Product, quantity?: number) => void;
@@ -22,6 +24,8 @@ interface ShopContextType {
   logout: () => void;
   activePage: string;
   setActivePage: (page: string) => void;
+  adminDashboardTab: AdminDashboardTab;
+  setAdminDashboardTab: (tab: AdminDashboardTab) => void;
   selectedProductId: string | null;
   setSelectedProductId: (id: string | null) => void;
   selectedCategory: string;
@@ -51,6 +55,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activePage, setActivePage] = useState<string>('home');
+  const [adminDashboardTab, setAdminDashboardTab] = useState<AdminDashboardTab>('overview');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -228,6 +233,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         activePage,
         setActivePage,
+        adminDashboardTab,
+        setAdminDashboardTab,
         selectedProductId,
         setSelectedProductId,
         selectedCategory,

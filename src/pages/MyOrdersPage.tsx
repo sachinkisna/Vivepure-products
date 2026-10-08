@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
+import { resolveProductImage } from '../components/ProductCard';
 import { Order, OrderStatus } from '../types';
 import { Search, Package, CheckCircle, Clock, Truck, Home, AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -257,7 +258,7 @@ export const MyOrdersPage: React.FC = () => {
                           <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
                             <div className="flex items-center gap-3">
                               <img
-                                src={item.image}
+                                src={resolveProductImage(item.image)}
                                 alt=""
                                 className="w-12 h-12 rounded-lg object-cover bg-[#F2EEE4]"
                               />
