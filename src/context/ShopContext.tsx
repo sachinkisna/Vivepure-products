@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, User } from '../types';
 import { api, clearAuthSession, getStoredToken } from '../services/api';
 
-export type AdminDashboardTab = 'overview' | 'products' | 'orders' | 'categories' | 'customers';
+export type AdminDashboardTab = 'overview' | 'products' | 'orders' | 'categories' | 'customers' | 'reviews';
 
 interface ShopContextType {
   cart: CartItem[];

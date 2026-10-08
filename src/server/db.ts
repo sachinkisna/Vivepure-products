@@ -96,11 +96,16 @@ class Database {
 
   public async getProducts(): Promise<Product[]> {
     const db = await getMongoDB();
-
-    return db
+    const products = await db
       .collection<Product>('products')
       .find({})
       .toArray();
+    const reviews = await db.collection<Review>('reviews')
+      .find({ $or: [{ status: 'approved' }, { status: { $exists: false } }] })
+      .toArray();
+    const reviewStats = this.getReviewStats(reviews);
+
+    return products.map(product => this.withReviewStats(product, reviewStats.get(product.id)));
   }
 
   public async getProductById(id: string): Promise<Product | undefined> {
@@ -113,7 +118,15 @@ class Database {
       ],
     });
 
-    return product ?? undefined;
+    if (!product) return undefined;
+
+    const reviews = await db.collection<Review>('reviews')
+      .find({
+        productId: product.id,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .toArray();
+    return this.withReviewStats(product, reviews);
   }
 
   public async createProduct(product: Product): Promise<Product> {
@@ -131,10 +144,11 @@ class Database {
     updates: Partial<Product>
   ): Promise<Product | null> {
     const db = await getMongoDB();
+    const { _id: _mongoId, ...safeUpdates } = updates as Partial<Product> & { _id?: unknown };
 
     const result = await db.collection<Product>('products').findOneAndUpdate(
       { id },
-      { $set: updates },
+      { $set: safeUpdates },
       { returnDocument: 'after' }
     );
 
@@ -144,7 +158,13 @@ class Database {
 
     await this.updateCategoryCounts();
 
-    return result;
+    const reviews = await db.collection<Review>('reviews')
+      .find({
+        productId: result.id,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .toArray();
+    return this.withReviewStats(result, reviews);
   }
 
   public async deleteProduct(id: string): Promise<boolean> {
@@ -405,7 +425,19 @@ class Database {
 
     return db
       .collection<Review>('reviews')
-      .find({ productId })
+      .find({
+        productId,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  public async getReviewsForAdmin(): Promise<Review[]> {
+    const db = await getMongoDB();
+
+    return db.collection<Review>('reviews')
+      .find({})
       .sort({ createdAt: -1 })
       .toArray();
   }
@@ -415,27 +447,47 @@ class Database {
 
     await db.collection<Review>('reviews').insertOne(review);
 
-    // Recalculate product rating
-    const productReviews = await db
-      .collection<Review>('reviews')
-      .find({ productId: review.productId })
-      .toArray();
+    return review;
+  }
 
-    const averageRating =
-      productReviews.reduce((sum, item) => sum + item.rating, 0) /
-      productReviews.length;
-
-    await db.collection<Product>('products').updateOne(
-      { id: review.productId },
-      {
-        $set: {
-          rating: Number(averageRating.toFixed(1)),
-          reviewCount: productReviews.length,
-        },
-      }
+  public async moderateReview(
+    id: string,
+    status: 'approved' | 'rejected'
+  ): Promise<Review | null> {
+    const db = await getMongoDB();
+    const review = await db.collection<Review>('reviews').findOneAndUpdate(
+      { id },
+      { $set: { status } },
+      { returnDocument: 'after' }
     );
 
     return review;
+  }
+
+  private getReviewStats(reviews: Review[]): Map<string, Review[]> {
+    const stats = new Map<string, Review[]>();
+    for (const review of reviews) {
+      const productReviews = stats.get(review.productId) ?? [];
+      productReviews.push(review);
+      stats.set(review.productId, productReviews);
+    }
+    return stats;
+  }
+
+  private withReviewStats(
+    product: Product,
+    reviews: Review[] | undefined
+  ): Product {
+    const approvedReviews = reviews ?? [];
+    const rating = approvedReviews.length
+      ? approvedReviews.reduce((total, review) => total + review.rating, 0) / approvedReviews.length
+      : 0;
+
+    return {
+      ...product,
+      rating: Number(rating.toFixed(1)),
+      reviewCount: approvedReviews.length,
+    };
   }
 
   // =========================

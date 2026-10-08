@@ -186,6 +186,9 @@ export const Navbar: React.FC<{ onOpenAuth: (mode?: AuthMode) => void }> = ({ on
                         <button onClick={() => handleAdminNav('categories')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
                           Categories Management
                         </button>
+                        <button onClick={() => handleAdminNav('reviews')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Reviews Approval
+                        </button>
                         <button onClick={() => handleAdminNav('customers')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
                           Customers
                         </button>
@@ -338,6 +341,9 @@ export const Navbar: React.FC<{ onOpenAuth: (mode?: AuthMode) => void }> = ({ on
               </button>
               <button onClick={() => handleAdminNav('categories')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
                 Categories Management
+              </button>
+              <button onClick={() => handleAdminNav('reviews')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Reviews Approval
               </button>
               <button onClick={() => handleAdminNav('customers')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
                 Customers

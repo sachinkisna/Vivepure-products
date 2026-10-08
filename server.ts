@@ -307,7 +307,7 @@ app.get('/api/products/:id', asyncHandler(async (req: Request, res: Response) =>
 
 // Admin Add Product
 app.post('/api/products', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
-  const { name, category, price, discountPrice, description, stock, images, benefits, ingredients, weight } = req.body;
+  const { name, category, price, discountPrice, description, stock, images, benefits, ingredients, usage, weight } = req.body;
   if (!name || !price || !category) {
     return res.status(400).json({ error: 'Product name, category and price are required' });
   }
@@ -323,6 +323,7 @@ app.post('/api/products', requireAdmin, asyncHandler(async (req: Request, res: R
     description: description || '',
     benefits: Array.isArray(benefits) ? benefits : [],
     ingredients: Array.isArray(ingredients) ? ingredients : [],
+    usage: typeof usage === 'string' ? usage : '',
     stock: Number(stock) || 0,
     images: images && images.length ? images : ['/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'],
     rating: 5.0,
@@ -590,6 +591,22 @@ app.get('/api/reviews/:productId', asyncHandler(async (req: Request, res: Respon
   res.json(await db.getReviewsForProduct(req.params.productId));
 }));
 
+app.get('/api/admin/reviews', requireAdmin, asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await db.getReviewsForAdmin());
+}));
+
+app.put('/api/admin/reviews/:id/status', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const status = req.body?.status;
+  if (status !== 'approved' && status !== 'rejected') {
+    return res.status(400).json({ error: 'Review status must be approved or rejected.' });
+  }
+
+  const review = await db.moderateReview(req.params.id, status);
+  if (!review) return res.status(404).json({ error: 'Review not found.' });
+
+  res.json(review);
+}));
+
 app.post('/api/reviews', requireCustomer, asyncHandler(async (req: Request, res: Response) => {
   const user = (req as AuthRequest).user!;
   const { productId, rating, comment } = req.body ?? {};
@@ -618,6 +635,7 @@ app.post('/api/reviews', requireCustomer, asyncHandler(async (req: Request, res:
     comment: comment.trim(),
     verifiedPurchase: await db.hasVerifiedPurchase(user.id, user.email, productId),
     createdAt: new Date().toISOString(),
+    status: 'pending',
   };
 
   const saved = await db.addReview(review);

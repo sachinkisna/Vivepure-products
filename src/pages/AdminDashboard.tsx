@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
 import { resolveProductImage } from '../components/ProductCard';
-import { Product, Order, Category, AdminStats, OrderStatus } from '../types';
+import { Product, Order, Category, AdminStats, OrderStatus, Review } from '../types';
 import {
   Package, ShoppingBag, Users, IndianRupee, Clock, CheckCircle2,
   AlertTriangle, Plus, Edit, Trash2, ArrowUpDown, Filter, Eye, X,
@@ -17,6 +17,7 @@ export const AdminDashboard: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,18 +45,20 @@ export const AdminDashboard: React.FC = () => {
   const loadAllAdminData = async () => {
     setLoading(true);
     try {
-      const [statsData, prods, ords, cats, custs] = await Promise.all([
+      const [statsData, prods, ords, cats, custs, reviewData] = await Promise.all([
         api.getAdminStats(),
         api.getProducts(),
         api.getOrders(),
         api.getCategories(),
         api.getCustomers(),
+        api.getAdminReviews(),
       ]);
       setStats(statsData);
       setProducts(prods);
       setOrders(ords);
       setCategories(cats);
       setCustomers(custs);
+      setReviews(reviewData);
     } catch (err) {
       console.error('Failed to load admin data', err);
     } finally {
@@ -128,6 +131,16 @@ export const AdminDashboard: React.FC = () => {
       api.getAdminStats().then(s => setStats(s));
     } catch (err: any) {
       showToast(err?.message || 'Failed to delete product');
+    }
+  };
+
+  const handleModerateReview = async (review: Review, status: 'approved' | 'rejected') => {
+    try {
+      const updated = await api.moderateReview(review.id, status);
+      setReviews(prev => prev.map(item => item.id === updated.id ? updated : item));
+      showToast(status === 'approved' ? 'Review approved and published.' : 'Review rejected.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update review.');
     }
   };
 
@@ -285,6 +298,19 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           Customers ({customers.length})
+        </button>
+        <button
+          onClick={() => selectAdminTab('reviews')}
+          className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            activeTab === 'reviews'
+              ? 'border-[#173F35] text-[#173F35]'
+              : 'border-transparent text-[#6A7B74] hover:text-[#17372F]'
+          }`}
+        >
+          <span>Reviews Approval</span>
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full tabular-nums">
+            {reviews.filter(review => (review.status ?? 'approved') === 'pending').length}
+          </span>
         </button>
       </div>
 
@@ -770,6 +796,65 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      {activeTab === 'reviews' && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="font-serif text-xl font-bold text-[#17372F]">Customer Reviews</h2>
+            <p className="text-xs text-[#6A7B74] mt-1">Approve reviews to publish them, or reject them to keep them hidden.</p>
+          </div>
+          {reviews.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#E7E2D6] p-8 text-center text-xs text-[#6A7B74]">
+              No customer reviews have been submitted.
+            </div>
+          ) : (
+            reviews
+              .slice()
+              .sort((a, b) => Number((b.status ?? 'approved') === 'pending') - Number((a.status ?? 'approved') === 'pending'))
+              .map(review => (
+                <article key={review.id} className="bg-white rounded-2xl border border-[#E7E2D6] p-5 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-sm text-[#17372F]">
+                        {products.find(product => product.id === review.productId)?.name ?? 'Product'}
+                      </h3>
+                      <p className="text-xs text-[#6A7B74] mt-1">
+                        {review.customerName} · {review.customerEmail} · {new Date(review.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                      (review.status ?? 'approved') === 'pending'
+                        ? 'bg-amber-100 text-amber-800'
+                        : review.status === 'rejected'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {review.status ?? 'approved'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#B9944A]">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
+                  <p className="text-sm text-[#4C5E58] whitespace-pre-wrap">{review.comment}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleModerateReview(review, 'approved')}
+                      disabled={(review.status ?? 'approved') === 'approved'}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 disabled:opacity-50 cursor-pointer"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleModerateReview(review, 'rejected')}
+                      disabled={review.status === 'rejected'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </article>
+              ))
+          )}
+        </div>
+      )}
+
       {/* Modal: Add / Edit Product */}
       {productModalOpen && editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -869,6 +954,51 @@ export const AdminDashboard: React.FC = () => {
                   onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                   placeholder="Formulation details, ingredients and natural benefits..."
                   className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A] focus:outline-none focus:border-[#173F35]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#17372F] mb-1">
+                    Ingredients Transparency
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editingProduct.ingredients?.join('\n') || ''}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      ingredients: e.target.value.split('\n').map(value => value.trim()).filter(Boolean),
+                    })}
+                    placeholder={'One ingredient per line'}
+                    className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#17372F] mb-1">
+                    Key Benefits / Formulation Highlights
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editingProduct.benefits?.join('\n') || ''}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      benefits: e.target.value.split('\n').map(value => value.trim()).filter(Boolean),
+                    })}
+                    placeholder={'One benefit per line'}
+                    className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#17372F] mb-1">
+                  Recommended Usage
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingProduct.usage || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, usage: e.target.value })}
+                  placeholder="How customers should use this product"
+                  className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
                 />
               </div>
 

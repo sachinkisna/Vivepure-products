@@ -98,8 +98,10 @@ npm run start
 - `PUT /api/orders/:id/cancel` — Cancel an owned, eligible order or an admin-managed order
 
 ### Reviews
-- `GET /api/reviews/:productId` — Fetch reviews for product
-- `POST /api/reviews` — Submit an authenticated customer review; purchase status is checked server-side
+- `GET /api/reviews/:productId` — Fetch approved reviews for a product
+- `POST /api/reviews` — Submit an authenticated customer review; purchase status is checked server-side and new reviews await admin approval
+- `GET /api/admin/reviews` — (Admin) List reviews for moderation
+- `PUT /api/admin/reviews/:id/status` — (Admin) Approve or reject a review
 
 ### Admin Analytics
 - `GET /api/admin/stats` — Summary metrics (Sales, Orders, Users, Low Stock)

@@ -123,6 +123,7 @@ export interface Review {
   comment: string;
   verifiedPurchase: boolean;
   createdAt: string;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface AdminStats {

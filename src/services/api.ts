@@ -8,7 +8,7 @@ import {
   CreateOrderRequest,
   CustomerSummary,
 } from '../types';
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_REVIEWS } from '../data/initialData';
+import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../data/initialData';
 
 const TOKEN_KEY = 'vivepanya_token';
 
@@ -216,11 +216,18 @@ export const api = {
 
   // --- Reviews ---
   async getReviews(productId: string): Promise<Review[]> {
-    try {
-      return await request<Review[]>(`/api/reviews/${productId}`);
-    } catch {
-      return INITIAL_REVIEWS.filter(r => r.productId === productId);
-    }
+    return await request<Review[]>(`/api/reviews/${productId}`);
+  },
+
+  async getAdminReviews(): Promise<Review[]> {
+    return await request<Review[]>('/api/admin/reviews');
+  },
+
+  async moderateReview(id: string, status: 'approved' | 'rejected'): Promise<Review> {
+    return await request<Review>(`/api/admin/reviews/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
   },
 
   async addReview(reviewData: {
