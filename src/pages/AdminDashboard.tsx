@@ -101,15 +101,20 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.name) return;
 
+    const productData = {
+      ...editingProduct,
+      images: (editingProduct.images ?? []).map(image => image.trim()).filter(Boolean),
+    };
+
     try {
       if (editingProduct.id) {
         // Update
-        const updated = await api.updateProduct(editingProduct.id, editingProduct);
+        const updated = await api.updateProduct(editingProduct.id, productData);
         setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
         showToast(`Updated product "${updated.name}"`);
       } else {
         // Create
-        const created = await api.createProduct(editingProduct);
+        const created = await api.createProduct(productData);
         setProducts(prev => [created, ...prev]);
         showToast(`Created new product "${created.name}"`);
       }
@@ -1002,18 +1007,68 @@ export const AdminDashboard: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#17372F] mb-1">
-                  Primary Image URL *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingProduct.images?.[0] || ''}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, images: [e.target.value] })}
-                  placeholder="/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
-                  className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
-                />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17372F]">
+                      Product Gallery Images
+                    </label>
+                    <p className="text-[10px] text-[#7A8A84] mt-0.5">
+                      First image is the main product image; additional images appear in the gallery.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct({
+                      ...editingProduct,
+                      images: [...(editingProduct.images ?? []), ''],
+                    })}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#EAF2EC] text-[#173F35] text-xs font-semibold hover:bg-[#DDECE2] cursor-pointer"
+                  >
+                    + Add image
+                  </button>
+                </div>
+                {(editingProduct.images ?? ['']).map((image, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-semibold text-[#52615D] mb-1">
+                        {index === 0 ? 'Main image URL *' : `Gallery image ${index + 1} URL`}
+                      </label>
+                      <input
+                        type="text"
+                        required={index === 0}
+                        value={image}
+                        onChange={(e) => {
+                          const images = [...(editingProduct.images ?? [])];
+                          images[index] = e.target.value;
+                          setEditingProduct({ ...editingProduct, images });
+                        }}
+                        placeholder="/src/assets/images/product_image.jpg or https://..."
+                        className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
+                      />
+                    </div>
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct({
+                          ...editingProduct,
+                          images: (editingProduct.images ?? []).filter((_, imageIndex) => imageIndex !== index),
+                        })}
+                        aria-label={`Remove gallery image ${index + 1}`}
+                        className="mt-5 p-2 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {image.trim() && (
+                      <img
+                        src={resolveProductImage(image.trim())}
+                        alt={`Preview ${index + 1}`}
+                        className="mt-5 w-10 h-10 rounded-lg object-cover border border-[#E7E2D6] bg-[#F2EEE4]"
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div className="flex gap-4 pt-2">
