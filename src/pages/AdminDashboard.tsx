@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
+import { resolveProductImage } from '../components/ProductCard';
 import { Product, Order, Category, AdminStats, OrderStatus } from '../types';
 import {
   Package, ShoppingBag, Users, IndianRupee, Clock, CheckCircle2,
@@ -67,7 +68,7 @@ export const AdminDashboard: React.FC = () => {
       description: '',
       stock: 50,
       weight: '125g',
-      images: ['/src/assets/images/product_neem_tulsi_soap_1790230421276.jpg'],
+      images: ['/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'],
       rating: 4.8,
       reviewCount: 0,
       isFeatured: false,
@@ -460,7 +461,7 @@ export const AdminDashboard: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.images[0]}
+                          src={resolveProductImage(p.images?.[0] || '')}
                           alt=""
                           className="w-10 h-10 rounded-lg object-cover bg-[#F2EEE4]"
                         />
@@ -712,7 +713,7 @@ export const AdminDashboard: React.FC = () => {
             {categories.map((c) => (
               <div key={c.id} className="bg-white p-4 rounded-2xl border border-[#E7E2D6] space-y-3">
                 <div className="aspect-[4/3] rounded-xl overflow-hidden bg-[#F2EEE4]">
-                  <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                  <img src={resolveProductImage(c.image)} alt={c.name} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h3 className="font-serif text-base font-bold text-[#17372F]">{c.name}</h3>
@@ -871,7 +872,7 @@ export const AdminDashboard: React.FC = () => {
                   required
                   value={editingProduct.images?.[0] || ''}
                   onChange={(e) => setEditingProduct({ ...editingProduct, images: [e.target.value] })}
-                  placeholder="/src/assets/images/product_neem_tulsi_soap_1790230421276.jpg"
+                  placeholder="/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg"
                   className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
                 />
               </div>
