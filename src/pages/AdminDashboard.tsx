@@ -82,7 +82,7 @@ export const AdminDashboard: React.FC = () => {
       description: '',
       stock: 50,
       weight: '125g',
-      images: ['/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'],
+      images: [],
       rating: 4.8,
       reviewCount: 0,
       isFeatured: false,
@@ -133,9 +133,15 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.name) return;
 
+    const images = (editingProduct.images ?? []).map(image => image.trim()).filter(Boolean);
+    if (images.length === 0) {
+      showToast('Add or upload at least one product image.');
+      return;
+    }
+
     const productData = {
       ...editingProduct,
-      images: (editingProduct.images ?? []).map(image => image.trim()).filter(Boolean),
+      images,
     };
 
     try {
@@ -1057,7 +1063,7 @@ export const AdminDashboard: React.FC = () => {
                     })}
                     className="shrink-0 px-3 py-1.5 rounded-lg bg-[#EAF2EC] text-[#173F35] text-xs font-semibold hover:bg-[#DDECE2] cursor-pointer"
                   >
-                    + Add image
+                    + Add image URL
                   </button>
                 </div>
                 <div
@@ -1103,15 +1109,19 @@ export const AdminDashboard: React.FC = () => {
                   </label>
                   <p className="text-[10px] text-[#7A8A84] mt-1">JPEG, PNG, WebP, GIF, or AVIF · up to 10 MB each</p>
                 </div>
-                {(editingProduct.images ?? ['']).map((image, index) => (
+                {(editingProduct.images ?? []).length === 0 && (
+                  <p className="text-xs text-[#7A8A84] text-center">
+                    No images added yet. Upload or add an image URL to continue.
+                  </p>
+                )}
+                {(editingProduct.images ?? []).map((image, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <div className="flex-1">
                       <label className="block text-[10px] font-semibold text-[#52615D] mb-1">
-                        {index === 0 ? 'Main image URL *' : `Gallery image ${index + 1} URL`}
+                        {index === 0 ? 'Main image URL' : `Gallery image ${index + 1} URL`}
                       </label>
                       <input
                         type="text"
-                        required={index === 0}
                         value={image}
                         onChange={(e) => {
                           const images = [...(editingProduct.images ?? [])];
@@ -1122,25 +1132,50 @@ export const AdminDashboard: React.FC = () => {
                         className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
                       />
                     </div>
-                    {index > 0 && (
+                    {index > 0 && image.trim() && (
                       <button
                         type="button"
-                        onClick={() => setEditingProduct({
-                          ...editingProduct,
-                          images: (editingProduct.images ?? []).filter((_, imageIndex) => imageIndex !== index),
+                        onClick={() => setEditingProduct(current => {
+                          if (!current) return current;
+                          const currentImages = [...(current.images ?? [])];
+                          const [selectedImage] = currentImages.splice(index, 1);
+                          currentImages.unshift(selectedImage);
+                          return { ...current, images: currentImages };
                         })}
-                        aria-label={`Remove gallery image ${index + 1}`}
+                        aria-label={`Set gallery image ${index + 1} as main image`}
+                        className="mt-5 px-2 py-1.5 text-[10px] text-[#173F35] border border-[#DBD5C5] rounded-lg hover:bg-[#EAF2EC] whitespace-nowrap cursor-pointer"
+                      >
+                        Set as main
+                      </button>
+                    )}
+                    {(editingProduct.images ?? []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct(current => current
+                          ? {
+                            ...current,
+                            images: (current.images ?? []).filter((_, imageIndex) => imageIndex !== index),
+                          }
+                          : current)}
+                        aria-label={`Remove image ${index + 1}`}
                         className="mt-5 p-2 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                     {image.trim() && (
-                      <img
-                        src={resolveProductImage(image.trim())}
-                        alt={`Preview ${index + 1}`}
-                        className="mt-5 w-10 h-10 rounded-lg object-cover border border-[#E7E2D6] bg-[#F2EEE4]"
-                      />
+                      <div className="mt-5 relative">
+                        <img
+                          src={resolveProductImage(image.trim())}
+                          alt={`Preview ${index + 1}`}
+                          className="w-10 h-10 rounded-lg object-cover border border-[#E7E2D6] bg-[#F2EEE4]"
+                        />
+                        {index === 0 && (
+                          <span className="absolute -top-1 -right-1 bg-[#173F35] text-white text-[8px] px-1 rounded">
+                            Main
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
