@@ -162,6 +162,39 @@ export const api = {
     });
   },
 
+  async uploadProductImage(file: File): Promise<{ url: string; name: string }> {
+    const token = getStoredToken();
+    if (!token) {
+      throw new Error('Sign in as an administrator to upload product images.');
+    }
+
+    const response = await fetch('/api/admin/product-images', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': file.type,
+        'X-File-Name': encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+
+    if (response.status === 401) {
+      clearAuthSession();
+      window.dispatchEvent(new Event('auth:expired'));
+    }
+
+    const result = await response.json().catch(() => ({})) as {
+      url?: string;
+      name?: string;
+      error?: string;
+    };
+    if (!response.ok || !result.url || !result.name) {
+      throw new Error(result.error || `Image upload failed (HTTP ${response.status}).`);
+    }
+
+    return { url: result.url, name: result.name };
+  },
+
   async deleteProduct(id: string): Promise<{ success: boolean }> {
     return await request<{ success: boolean }>(`/api/products/${id}`, {
       method: 'DELETE',

@@ -348,6 +348,98 @@ app.put('/api/products/:id', requireAdmin, asyncHandler(async (req: Request, res
   res.json(updated);
 }));
 
+app.post(
+  '/api/admin/product-images',
+  ...requireAdmin,
+  express.raw({
+    type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'],
+    limit: '10mb',
+  }),
+  asyncHandler(async (req: Request, res: Response) => {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY?.trim();
+    if (!privateKey) {
+      return res.status(503).json({ error: 'Image uploads are not configured on the server.' });
+    }
+
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Select a valid image file to upload.' });
+    }
+
+    const contentType = req.header('Content-Type') ?? '';
+    const allowedTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'image/avif',
+    ]);
+    if (!allowedTypes.has(contentType)) {
+      return res.status(415).json({ error: 'Upload a JPEG, PNG, WebP, GIF, or AVIF image.' });
+    }
+
+    const encodedName = req.header('X-File-Name');
+    if (!encodedName) {
+      return res.status(400).json({ error: 'Image filename is required.' });
+    }
+
+    let originalName: string;
+    try {
+      originalName = decodeURIComponent(encodedName);
+    } catch {
+      return res.status(400).json({ error: 'Image filename is invalid.' });
+    }
+
+    const fileName = originalName
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(0, 120);
+    if (!fileName) {
+      return res.status(400).json({ error: 'Image filename is invalid.' });
+    }
+
+    const form = new FormData();
+    const imageBytes = new ArrayBuffer(req.body.length);
+    new Uint8Array(imageBytes).set(req.body);
+    form.append('file', new Blob([imageBytes], { type: contentType }), fileName);
+    form.append('fileName', fileName);
+    form.append('folder', '/vivepanya/products');
+    form.append('useUniqueFileName', 'true');
+
+    let imageKitResponse: globalThis.Response;
+    try {
+      imageKitResponse = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}`,
+          Accept: 'application/json',
+        },
+        body: form,
+      });
+    } catch (error) {
+      console.error('ImageKit upload request failed:', error instanceof Error ? error.message : 'Unknown error');
+      return res.status(502).json({ error: 'Image upload provider is unavailable. Please try again.' });
+    }
+
+    const result = await imageKitResponse.json().catch(() => null) as
+      | { url?: unknown; name?: unknown; message?: unknown }
+      | null;
+    if (!imageKitResponse.ok || typeof result?.url !== 'string') {
+      console.error(`ImageKit upload failed with HTTP ${imageKitResponse.status}.`);
+      return res.status(502).json({
+        error: typeof result?.message === 'string'
+          ? result.message
+          : 'Image upload failed. Please try again.',
+      });
+    }
+
+    res.status(201).json({
+      url: result.url,
+      name: typeof result.name === 'string' ? result.name : fileName,
+    });
+  })
+);
+
 // Admin Delete Product
 app.delete('/api/products/:id', requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const deleted = await db.deleteProduct(req.params.id);
@@ -701,9 +793,15 @@ async function startServer() {
     const databaseUnavailable =
       error instanceof Error &&
       ['MongoNetworkError', 'MongoServerSelectionError'].includes(error.name);
+    const oversizedUpload =
+      error instanceof Error &&
+      'type' in error &&
+      error.type === 'entity.too.large';
 
-    res.status(databaseUnavailable ? 503 : 500).json({
-      error: databaseUnavailable
+    res.status(oversizedUpload ? 413 : databaseUnavailable ? 503 : 500).json({
+      error: oversizedUpload
+        ? 'Image exceeds the 10 MB upload limit.'
+        : databaseUnavailable
         ? 'Database is currently unavailable'
         : 'Internal server error',
     });

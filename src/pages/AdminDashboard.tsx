@@ -6,7 +6,7 @@ import { Product, Order, Category, AdminStats, OrderStatus, Review } from '../ty
 import {
   Package, ShoppingBag, Users, IndianRupee, Clock, CheckCircle2,
   AlertTriangle, Plus, Edit, Trash2, ArrowUpDown, Filter, Eye, X,
-  Save, RefreshCw, Shield, ChevronRight, Truck
+  Save, RefreshCw, Shield, ChevronRight, Truck, UploadCloud
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -28,6 +28,8 @@ export const AdminDashboard: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [imageDropActive, setImageDropActive] = useState(false);
 
   useEffect(() => {
     setActiveTab(adminDashboardTab);
@@ -95,6 +97,36 @@ export const AdminDashboard: React.FC = () => {
   const handleEditProduct = (prod: Product) => {
     setEditingProduct({ ...prod });
     setProductModalOpen(true);
+  };
+
+  const handleProductImageFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+
+    setUploadingImages(true);
+    try {
+      for (const file of files) {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'].includes(file.type)) {
+          showToast(`${file.name} is not a supported image format.`);
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast(`${file.name} exceeds the 10 MB upload limit.`);
+          continue;
+        }
+
+        try {
+          const uploaded = await api.uploadProductImage(file);
+          setEditingProduct(current => current
+            ? { ...current, images: [...(current.images ?? []), uploaded.url] }
+            : current);
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : `Failed to upload ${file.name}.`);
+        }
+      }
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -1028,6 +1060,49 @@ export const AdminDashboard: React.FC = () => {
                     + Add image
                   </button>
                 </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setImageDropActive(true);
+                  }}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setImageDropActive(false);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setImageDropActive(false);
+                    void handleProductImageFiles(event.dataTransfer.files);
+                  }}
+                  className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+                    imageDropActive
+                      ? 'border-[#173F35] bg-[#EAF2EC]'
+                      : 'border-[#DBD5C5] bg-white'
+                  }`}
+                >
+                  <UploadCloud className="w-5 h-5 mx-auto text-[#173F35] mb-1" />
+                  <p className="text-xs text-[#52615D]">
+                    {uploadingImages ? 'Uploading images...' : 'Drag and drop product images here'}
+                  </p>
+                  <label className="inline-block mt-1 text-xs font-semibold text-[#173F35] underline cursor-pointer">
+                    or browse files
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                      multiple
+                      disabled={uploadingImages}
+                      onChange={(event) => {
+                        if (event.currentTarget.files) {
+                          void handleProductImageFiles(event.currentTarget.files);
+                          event.currentTarget.value = '';
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                  <p className="text-[10px] text-[#7A8A84] mt-1">JPEG, PNG, WebP, GIF, or AVIF · up to 10 MB each</p>
+                </div>
                 {(editingProduct.images ?? ['']).map((image, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <div className="flex-1">
@@ -1113,9 +1188,10 @@ export const AdminDashboard: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-5 bg-[#173F35] text-white text-xs font-bold rounded-xl hover:bg-[#235D4E] cursor-pointer shadow-sm"
+                  disabled={uploadingImages}
+                  className="py-2 px-5 bg-[#173F35] text-white text-xs font-bold rounded-xl hover:bg-[#235D4E] disabled:opacity-60 cursor-pointer shadow-sm"
                 >
-                  Save Product
+                  {uploadingImages ? 'Uploading Images...' : 'Save Product'}
                 </button>
               </div>
             </form>

@@ -109,6 +109,9 @@ npm run start
 
 Online payment is not integrated. Online orders remain unpaid until a real server-side payment provider integration verifies them; the application does not claim to verify or refund payments.
 
+### Product Image Uploads
+Set `IMAGEKIT_PRIVATE_KEY` in the server environment to enable administrator image uploads. The key is used only by the server and must not be added to frontend code. Product images are uploaded into the `/vivepanya/products` ImageKit folder; uploads are limited to 10 MB per JPEG, PNG, WebP, GIF, or AVIF image.
+
 ---
 
 ## 5. Discount Coupons
