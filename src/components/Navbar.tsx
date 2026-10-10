@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { ViveLogo } from './ViveLogo';
-import { useShop } from '../context/ShopContext';
-import { ShoppingBag, Search, User as UserIcon, Shield, Menu, X, BookOpen } from 'lucide-react';
+import { AdminDashboardTab, useShop } from '../context/ShopContext';
+import { ShoppingBag, Search, User as UserIcon, Menu, X } from 'lucide-react';
 
-export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => {
+type AuthMode = 'login' | 'register';
+
+export const Navbar: React.FC<{ onOpenAuth: (mode?: AuthMode) => void }> = ({ onOpenAuth }) => {
   const {
     activePage,
     setActivePage,
     cartCount,
     user,
     logout,
+    setAdminDashboardTab,
     searchQuery,
     setSearchQuery,
     setSelectedCategory,
@@ -23,6 +26,11 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
     setActivePage(page);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAdminNav = (tab: AdminDashboardTab) => {
+    setAdminDashboardTab(tab);
+    handleNavClick('admin');
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -147,79 +155,77 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
               <Search className="w-5 h-5" />
             </button>
 
-            {/* Setup & Deployment Guide Button */}
-            <button
-              onClick={() => handleNavClick('guide')}
-              title="Full Stack & MongoDB Setup Guide"
-              className={`hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                activePage === 'guide'
-                  ? 'bg-[#EAF2EC] text-[#173F35] border-[#173F35]/30'
-                  : 'border-[#DBD5C5] text-[#4A5D56] hover:bg-white'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-[#173F35]" />
-              <span>Setup Guide</span>
-            </button>
-
-            {/* Admin Portal Toggle */}
-            <button
-              onClick={() => handleNavClick('admin')}
-              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                activePage === 'admin'
-                  ? 'bg-[#173F35] text-white border-[#173F35]'
-                  : 'border-[#DBD5C5] text-[#2C4039] hover:bg-[#EAF2EC] hover:text-[#173F35]'
-              }`}
-              title="Admin & Seller Management Dashboard"
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
-
             {/* User Account / Auth */}
             {user ? (
               <div className="relative group">
                 <button
-                  onClick={() => handleNavClick('orders')}
+                  onClick={() => user.role === 'admin' ? handleAdminNav('overview') : handleNavClick('orders')}
                   className="flex items-center gap-1.5 text-xs font-medium py-1.5 px-2.5 rounded-lg bg-white border border-[#DBD5C5] text-[#1E2E2A] hover:border-[#173F35] cursor-pointer"
+                  aria-label={user.role === 'admin' ? 'Open admin dashboard menu' : 'Open my orders'}
                 >
                   <UserIcon className="w-3.5 h-3.5 text-[#173F35]" />
                   <span className="hidden sm:inline max-w-[85px] truncate">{user.name.split(' ')[0]}</span>
                 </button>
-                <div className="absolute right-0 mt-1 w-44 bg-white border border-[#E7E2D6] rounded-xl shadow-lg py-1.5 hidden group-hover:block z-50">
-                  <div className="px-3 py-1.5 border-b border-[#F0EBE0] text-xs">
-                    <p className="font-semibold text-[#1E2E2A] truncate">{user.name}</p>
-                    <p className="text-[#7A8A84] truncate">{user.email}</p>
-                  </div>
-                  <button
-                    onClick={() => handleNavClick('orders')}
-                    className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer"
-                  >
-                    My Orders
-                  </button>
-                  {user.role === 'admin' && (
+                <div className="absolute right-0 top-full hidden group-hover:block group-focus-within:block z-50 pt-1">
+                  <div className="w-56 bg-white border border-[#E7E2D6] rounded-xl shadow-lg py-1.5">
+                    <div className="px-3 py-1.5 border-b border-[#F0EBE0] text-xs">
+                      <p className="font-semibold text-[#1E2E2A] truncate">{user.name}</p>
+                      <p className="text-[#7A8A84] truncate">{user.email}</p>
+                    </div>
+                    {user.role === 'admin' ? (
+                      <>
+                        <button onClick={() => handleAdminNav('overview')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Admin Dashboard
+                        </button>
+                        <button onClick={() => handleAdminNav('products')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Products Management
+                        </button>
+                        <button onClick={() => handleAdminNav('orders')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Orders &amp; Tracking
+                        </button>
+                        <button onClick={() => handleAdminNav('categories')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Categories Management
+                        </button>
+                        <button onClick={() => handleAdminNav('reviews')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Reviews Approval
+                        </button>
+                        <button onClick={() => handleAdminNav('customers')} className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer">
+                          Customers
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleNavClick('orders')}
+                        className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer"
+                      >
+                        My Orders
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleNavClick('admin')}
-                      className="w-full text-left px-3 py-1.5 text-xs text-[#2C4039] hover:bg-[#FAF8F5] cursor-pointer"
+                      onClick={logout}
+                      className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
                     >
-                      Admin Dashboard
+                      Sign Out
                     </button>
-                  )}
-                  <button
-                    onClick={logout}
-                    className="w-full text-left px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 cursor-pointer"
-                  >
-                    Sign Out
-                  </button>
+                  </div>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={onOpenAuth}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-white border border-[#DBD5C5] text-[#1E2E2A] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
-              >
-                <UserIcon className="w-3.5 h-3.5 text-[#173F35]" />
-                <span>Login</span>
-              </button>
+              <>
+                <button
+                  onClick={() => onOpenAuth('login')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-white border border-[#DBD5C5] text-[#1E2E2A] hover:bg-[#FAF8F5] transition-colors cursor-pointer"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-[#173F35]" />
+                  <span>Login</span>
+                </button>
+                <button
+                  onClick={() => onOpenAuth('register')}
+                  className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-lg bg-[#173F35] text-white hover:bg-[#235D4E] transition-colors cursor-pointer"
+                >
+                  Register
+                </button>
+              </>
             )}
 
             {/* Shopping Cart Button with Counter */}
@@ -321,18 +327,48 @@ export const Navbar: React.FC<{ onOpenAuth: () => void }> = ({ onOpenAuth }) => 
           >
             Contact Us
           </button>
-          <button
-            onClick={() => handleNavClick('guide')}
-            className="block w-full text-left py-2 text-sm font-medium text-[#173F35]"
-          >
-            Full Stack & MongoDB Setup Guide
-          </button>
-          <button
-            onClick={() => handleNavClick('admin')}
-            className="block w-full text-left py-2 text-sm font-medium text-[#B9944A]"
-          >
-            Seller / Admin Dashboard
-          </button>
+          {user?.role === 'admin' && (
+            <div className="border-t border-[#E7E2D6] pt-2 mt-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#7A8A84] pb-1">Admin</p>
+              <button onClick={() => handleAdminNav('overview')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Admin Dashboard
+              </button>
+              <button onClick={() => handleAdminNav('products')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Products Management
+              </button>
+              <button onClick={() => handleAdminNav('orders')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Orders &amp; Tracking
+              </button>
+              <button onClick={() => handleAdminNav('categories')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Categories Management
+              </button>
+              <button onClick={() => handleAdminNav('reviews')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Reviews Approval
+              </button>
+              <button onClick={() => handleAdminNav('customers')} className="block w-full text-left py-2 text-sm font-medium text-[#2C4039]">
+                Customers
+              </button>
+              <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="block w-full text-left py-2 text-sm font-medium text-rose-600">
+                Sign Out
+              </button>
+            </div>
+          )}
+          {!user && (
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => { onOpenAuth('login'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 rounded-lg border border-[#DBD5C5] text-sm font-semibold text-[#173F35]"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => { onOpenAuth('register'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 rounded-lg bg-[#173F35] text-sm font-semibold text-white"
+              >
+                Register
+              </button>
+            </div>
+          )}
         </div>
       )}
     </header>

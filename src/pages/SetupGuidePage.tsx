@@ -25,31 +25,15 @@ export const SetupGuidePage: React.FC = () => {
         </p>
       </div>
 
-      {/* 1. Admin Credentials Box */}
+      {/* 1. Admin authentication setup */}
       <div className="bg-[#173F35] text-white p-6 sm:p-8 rounded-3xl shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-[#B9944A]">
           <Shield className="w-5 h-5" />
-          <h2 className="font-serif text-xl font-bold text-white">Default Admin & Demo Credentials</h2>
+          <h2 className="font-serif text-xl font-bold text-white">Administrator Authentication</h2>
         </div>
         <p className="text-xs text-[#CADAD5]">
-          The database is pre-seeded with administrator and customer accounts for immediate testing:
+          There are no default or demo logins. Customer accounts are created through registration. Set a unique administrator email and password in the server environment, then run <code>npm run configure:admin</code>; MongoDB stores only a bcrypt password hash.
         </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          <div className="bg-white/10 p-4 rounded-2xl border border-white/10 text-xs space-y-1">
-            <span className="font-bold text-[#B9944A] uppercase text-[10px]">Administrator Access</span>
-            <p className="text-white"><strong className="text-emerald-300">Email:</strong> admin@vivepanya.com</p>
-            <p className="text-white"><strong className="text-emerald-300">Password:</strong> admin123</p>
-            <p className="text-[11px] text-[#A3B8B0] pt-1">Unlocks full stock control, order status advancement, and product creation.</p>
-          </div>
-
-          <div className="bg-white/10 p-4 rounded-2xl border border-white/10 text-xs space-y-1">
-            <span className="font-bold text-[#B9944A] uppercase text-[10px]">Customer Access</span>
-            <p className="text-white"><strong className="text-emerald-300">Email:</strong> customer@vivepanya.com</p>
-            <p className="text-white"><strong className="text-emerald-300">Password:</strong> password123</p>
-            <p className="text-[11px] text-[#A3B8B0] pt-1">Has existing order history (VP-2026-1001) for order tracking testing.</p>
-          </div>
-        </div>
       </div>
 
       {/* 2. Step 1: Dependencies */}
@@ -79,18 +63,19 @@ export const SetupGuidePage: React.FC = () => {
           <h3 className="font-serif text-xl font-bold text-[#17372F]">2. Setting Up MongoDB (Local or Atlas)</h3>
         </div>
         <p className="text-xs text-[#52615D] leading-relaxed">
-          The application comes built with a robust Dual-Engine architecture:
+          Data-backed API requests require MongoDB. Order placement uses transactions, so local MongoDB must run as a replica set; MongoDB Atlas is already replica-set capable.
         </p>
         <ul className="text-xs text-[#52615D] space-y-2 list-disc list-inside">
-          <li><strong>Built-in Persistent JSON Store:</strong> Runs out of the box with zero external configuration required. All changes to products, orders, and users persist to <code>data/store.json</code>.</li>
-          <li><strong>MongoDB Connection (Optional/Production):</strong> Create a <code>.env</code> file from <code>.env.example</code>:</li>
+          <li><strong>MongoDB Atlas:</strong> Create a <code>.env</code> file and set <code>MONGODB_URI</code>. Ensure your Atlas cluster is running and your current IP address is allowed in Network Access.</li>
         </ul>
 
         <div className="relative bg-[#1A2522] text-[#A3E6D0] p-4 rounded-2xl font-mono text-xs overflow-x-auto space-y-1">
           <p># In .env</p>
           <p>PORT=3000</p>
-          <p>JWT_SECRET="vivepanya_jwt_super_secret_production_key_2026"</p>
-          <p>MONGODB_URI="mongodb+srv://&lt;username&gt;:&lt;password&gt;@cluster0.mongodb.net/vivepanya_emart?retryWrites=true&w=majority"</p>
+          <p>JWT_SECRET=&lt;private-random-secret-at-least-32-bytes&gt;</p>
+          <p>ADMIN_EMAIL=&lt;administrator-email&gt;</p>
+          <p>ADMIN_PASSWORD=&lt;unique-password&gt;</p>
+          <p>MONGODB_URI=&lt;private-mongodb-uri&gt;</p>
           <button
             onClick={() => copyToClipboard('MONGODB_URI="mongodb+srv://<username>:<password>@cluster0.mongodb.net/vivepanya_emart?retryWrites=true&w=majority"')}
             className="absolute right-3 top-3 text-[#A3E6D0] hover:text-white"
@@ -103,7 +88,8 @@ export const SetupGuidePage: React.FC = () => {
           To start a local MongoDB instance with Docker or system service:
         </p>
         <div className="relative bg-[#1A2522] text-[#A3E6D0] p-3 rounded-xl font-mono text-xs overflow-x-auto">
-          <code>docker run -d -p 27017:27017 --name mongodb-vivepanya mongo:latest</code>
+          <code>docker run -d -p 27017:27017 --name mongodb-vivepanya mongo:latest --replSet rs0</code>
+          <code>docker exec mongodb-vivepanya mongosh --eval "rs.initiate()"</code>
         </div>
       </div>
 

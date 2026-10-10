@@ -9,21 +9,14 @@ VIVEPANYA E-mart Private Ltd. is a modern full-stack e-commerce web application 
 - **Frontend:** React 19, TypeScript, Tailwind CSS, Lucide Icons, Context API
 - **Backend:** Node.js, Express.js REST API
 - **Authentication:** JSON Web Tokens (JWT) & bcryptjs password hashing
-- **Database:** Dual engine:
-  - Built-in Persistent JSON database (`data/store.json`) with auto-seeding
-  - MongoDB / MongoDB Atlas integration via `MONGODB_URI`
+- **Database:** MongoDB / MongoDB Atlas via `MONGODB_URI`
 - **Architecture:** Unified Express server with Vite middleware in development and static asset serving in production.
 
 ---
 
-## 2. Default Accounts & Admin Credentials
+## 2. Accounts
 
-| Role | Email | Password | Access Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Administrator** | `admin@vivepanya.com` | `admin123` | Full control: Product creation/editing/deletion, Stock adjustment, Order status lifecycle, Sales metrics |
-| **Verified Customer** | `customer@vivepanya.com` | `password123` | Shopping cart, Checkout, Order placement, Order history tracking |
-
-*(You can also use the 1-Click Demo buttons on the Login modal to sign in instantly without typing).*
+Customers create accounts through the registration form. Admin authentication uses the administrator email and bcrypt password hash stored in MongoDB; no demo credentials are shipped in the client.
 
 ---
 
@@ -43,18 +36,20 @@ cp .env.example .env
 In `.env`, configure your settings:
 ```env
 PORT=3000
-JWT_SECRET=vivepanya_super_secret_jwt_key_2026
+JWT_SECRET=<generate-a-private-random-secret-of-at-least-32-bytes>
+ADMIN_EMAIL=<administrator-email-used-during-migration>
+ADMIN_PASSWORD=<new-unique-administrator-password-used-during-migration>
 
-# Optional: MongoDB connection string (leave unset to use built-in store)
-# MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/vivepanya?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/vivepanya?retryWrites=true&w=majority
 ```
+Keep all server configuration out of `VITE_*` variables. Use a private random `JWT_SECRET`; never copy a sample value into production. Use `npm run configure:admin` to store `ADMIN_EMAIL` and a bcrypt hash of `ADMIN_PASSWORD` in the existing MongoDB settings record. This updates only administrator settings and does not replace store data. Unset `ADMIN_PASSWORD` after configuration. Do not use the legacy data migration against a populated database.
 
 #### Running MongoDB Locally (Optional)
 If you prefer running a local MongoDB instance with Docker:
 ```bash
 docker run -d -p 27017:27017 --name mongodb-vivepanya mongo:latest
 ```
-Set `MONGODB_URI="mongodb://localhost:27017/vivepanya_emart"` in your `.env`.
+For transactional order stock updates, configure the local server as a replica set and use `MONGODB_URI="mongodb://localhost:27017/vivepanya?replicaSet=rs0"` in your `.env`.
 
 ### Step 3: Run the Complete Application (Dev Server)
 To start both the backend API and frontend Vite server together:
@@ -96,19 +91,26 @@ npm run start
 - `POST /api/categories` — (Admin) Create category
 
 ### Orders
-- `POST /api/orders` — Place order and generate unique Order ID (`VP-2026-XXXX`)
-- `GET /api/orders` — Retrieve user orders or all orders for admin
-- `GET /api/orders/:id` — Retrieve specific order details
+- `POST /api/orders` — Place an authenticated order; server validates products, stock, and totals
+- `GET /api/orders` — Retrieve the authenticated customer's orders or all orders for an admin
+- `GET /api/orders/:id` — Retrieve an owned order or an order for an authenticated admin
 - `PUT /api/orders/:id/status` — (Admin) Advance order status (`Pending` -> `Confirmed` -> `Packed` -> `Shipped` -> `Out for Delivery` -> `Delivered`)
-- `PUT /api/orders/:id/cancel` — Cancel an order with reason
+- `PUT /api/orders/:id/cancel` — Cancel an owned, eligible order or an admin-managed order
 
 ### Reviews
-- `GET /api/reviews/:productId` — Fetch reviews for product
-- `POST /api/reviews` — Submit verified customer review
+- `GET /api/reviews/:productId` — Fetch approved reviews for a product
+- `POST /api/reviews` — Submit an authenticated customer review; purchase status is checked server-side and new reviews await admin approval
+- `GET /api/admin/reviews` — (Admin) List reviews for moderation
+- `PUT /api/admin/reviews/:id/status` — (Admin) Approve or reject a review
 
 ### Admin Analytics
 - `GET /api/admin/stats` — Summary metrics (Sales, Orders, Users, Low Stock)
 - `GET /api/admin/customers` — List registered customers
+
+Online payment is not integrated. Online orders remain unpaid until a real server-side payment provider integration verifies them; the application does not claim to verify or refund payments.
+
+### Product Image Uploads
+Set `IMAGEKIT_PRIVATE_KEY` in the server environment to enable administrator image uploads. The key is used only by the server and must not be added to frontend code. Product images are uploaded into the `/vivepanya/products` ImageKit folder; uploads are limited to 10 MB per JPEG, PNG, WebP, GIF, or AVIF image.
 
 ---
 

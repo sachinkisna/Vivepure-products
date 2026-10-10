@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
-import { Product, Order, Category, AdminStats, OrderStatus } from '../types';
+import { resolveProductImage } from '../components/ProductCard';
+import { Product, Order, Category, AdminStats, OrderStatus, Review } from '../types';
 import {
   Package, ShoppingBag, Users, IndianRupee, Clock, CheckCircle2,
   AlertTriangle, Plus, Edit, Trash2, ArrowUpDown, Filter, Eye, X,
-  Save, RefreshCw, Shield, ChevronRight, Truck
+  Save, RefreshCw, Shield, ChevronRight, Truck, UploadCloud
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
-  const { user, showToast, setActivePage } = useShop();
+  const { user, showToast, setActivePage, adminDashboardTab, setAdminDashboardTab } = useShop();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'categories' | 'customers'>('overview');
+  const [activeTab, setActiveTab] = useState(adminDashboardTab);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +28,17 @@ export const AdminDashboard: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [imageDropActive, setImageDropActive] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(adminDashboardTab);
+  }, [adminDashboardTab]);
+
+  const selectAdminTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setAdminDashboardTab(tab);
+  };
 
   // Filter in admin
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
@@ -34,18 +47,20 @@ export const AdminDashboard: React.FC = () => {
   const loadAllAdminData = async () => {
     setLoading(true);
     try {
-      const [statsData, prods, ords, cats, custs] = await Promise.all([
+      const [statsData, prods, ords, cats, custs, reviewData] = await Promise.all([
         api.getAdminStats(),
         api.getProducts(),
-        api.getOrders(undefined, true),
+        api.getOrders(),
         api.getCategories(),
         api.getCustomers(),
+        api.getAdminReviews(),
       ]);
       setStats(statsData);
       setProducts(prods);
       setOrders(ords);
       setCategories(cats);
       setCustomers(custs);
+      setReviews(reviewData);
     } catch (err) {
       console.error('Failed to load admin data', err);
     } finally {
@@ -67,7 +82,7 @@ export const AdminDashboard: React.FC = () => {
       description: '',
       stock: 50,
       weight: '125g',
-      images: ['/src/assets/images/product_neem_tulsi_soap_1790230421276.jpg'],
+      images: [],
       rating: 4.8,
       reviewCount: 0,
       isFeatured: false,
@@ -84,19 +99,60 @@ export const AdminDashboard: React.FC = () => {
     setProductModalOpen(true);
   };
 
+  const handleProductImageFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+
+    setUploadingImages(true);
+    try {
+      for (const file of files) {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'].includes(file.type)) {
+          showToast(`${file.name} is not a supported image format.`);
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast(`${file.name} exceeds the 10 MB upload limit.`);
+          continue;
+        }
+
+        try {
+          const uploaded = await api.uploadProductImage(file);
+          setEditingProduct(current => current
+            ? { ...current, images: [...(current.images ?? []), uploaded.url] }
+            : current);
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : `Failed to upload ${file.name}.`);
+        }
+      }
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.name) return;
 
+    const images = (editingProduct.images ?? []).map(image => image.trim()).filter(Boolean);
+    if (images.length === 0) {
+      showToast('Add or upload at least one product image.');
+      return;
+    }
+
+    const productData = {
+      ...editingProduct,
+      images,
+    };
+
     try {
       if (editingProduct.id) {
         // Update
-        const updated = await api.updateProduct(editingProduct.id, editingProduct);
+        const updated = await api.updateProduct(editingProduct.id, productData);
         setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
         showToast(`Updated product "${updated.name}"`);
       } else {
         // Create
-        const created = await api.createProduct(editingProduct);
+        const created = await api.createProduct(productData);
         setProducts(prev => [created, ...prev]);
         showToast(`Created new product "${created.name}"`);
       }
@@ -118,6 +174,16 @@ export const AdminDashboard: React.FC = () => {
       api.getAdminStats().then(s => setStats(s));
     } catch (err: any) {
       showToast(err?.message || 'Failed to delete product');
+    }
+  };
+
+  const handleModerateReview = async (review: Review, status: 'approved' | 'rejected') => {
+    try {
+      const updated = await api.moderateReview(review.id, status);
+      setReviews(prev => prev.map(item => item.id === updated.id ? updated : item));
+      showToast(status === 'approved' ? 'Review approved and published.' : 'Review rejected.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update review.');
     }
   };
 
@@ -221,7 +287,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="flex border-b border-[#E7E2D6] gap-4 sm:gap-8 text-xs sm:text-sm font-semibold overflow-x-auto pb-px">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => selectAdminTab('overview')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'overview'
               ? 'border-[#173F35] text-[#173F35]'
@@ -231,7 +297,7 @@ export const AdminDashboard: React.FC = () => {
           Dashboard Overview
         </button>
         <button
-          onClick={() => setActiveTab('products')}
+          onClick={() => selectAdminTab('products')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeTab === 'products'
               ? 'border-[#173F35] text-[#173F35]'
@@ -244,7 +310,7 @@ export const AdminDashboard: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('orders')}
+          onClick={() => selectAdminTab('orders')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeTab === 'orders'
               ? 'border-[#173F35] text-[#173F35]'
@@ -257,7 +323,7 @@ export const AdminDashboard: React.FC = () => {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab('categories')}
+          onClick={() => selectAdminTab('categories')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'categories'
               ? 'border-[#173F35] text-[#173F35]'
@@ -267,7 +333,7 @@ export const AdminDashboard: React.FC = () => {
           Categories ({categories.length})
         </button>
         <button
-          onClick={() => setActiveTab('customers')}
+          onClick={() => selectAdminTab('customers')}
           className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors ${
             activeTab === 'customers'
               ? 'border-[#173F35] text-[#173F35]'
@@ -275,6 +341,19 @@ export const AdminDashboard: React.FC = () => {
           }`}
         >
           Customers ({customers.length})
+        </button>
+        <button
+          onClick={() => selectAdminTab('reviews')}
+          className={`pb-3 border-b-2 cursor-pointer whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            activeTab === 'reviews'
+              ? 'border-[#173F35] text-[#173F35]'
+              : 'border-transparent text-[#6A7B74] hover:text-[#17372F]'
+          }`}
+        >
+          <span>Reviews Approval</span>
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full tabular-nums">
+            {reviews.filter(review => (review.status ?? 'approved') === 'pending').length}
+          </span>
         </button>
       </div>
 
@@ -374,7 +453,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="font-serif text-xl font-bold text-[#17372F]">Recent Orders</h2>
               <button
-                onClick={() => setActiveTab('orders')}
+                onClick={() => selectAdminTab('orders')}
                 className="text-xs font-semibold text-[#173F35] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View All ({orders.length})</span>
@@ -401,7 +480,7 @@ export const AdminDashboard: React.FC = () => {
                     <button
                       onClick={() => {
                         setSelectedOrderDetails(order);
-                        setActiveTab('orders');
+                        selectAdminTab('orders');
                       }}
                       className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#FAF8F5] border border-[#DBD5C5] text-[#173F35] hover:bg-[#EAF2EC] cursor-pointer"
                     >
@@ -460,7 +539,7 @@ export const AdminDashboard: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.images[0]}
+                          src={resolveProductImage(p.images?.[0] || '')}
                           alt=""
                           className="w-10 h-10 rounded-lg object-cover bg-[#F2EEE4]"
                         />
@@ -712,7 +791,7 @@ export const AdminDashboard: React.FC = () => {
             {categories.map((c) => (
               <div key={c.id} className="bg-white p-4 rounded-2xl border border-[#E7E2D6] space-y-3">
                 <div className="aspect-[4/3] rounded-xl overflow-hidden bg-[#F2EEE4]">
-                  <img src={c.image} alt={c.name} className="w-full h-full object-cover" />
+                  <img src={resolveProductImage(c.image)} alt={c.name} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h3 className="font-serif text-base font-bold text-[#17372F]">{c.name}</h3>
@@ -757,6 +836,65 @@ export const AdminDashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'reviews' && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="font-serif text-xl font-bold text-[#17372F]">Customer Reviews</h2>
+            <p className="text-xs text-[#6A7B74] mt-1">Approve reviews to publish them, or reject them to keep them hidden.</p>
+          </div>
+          {reviews.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#E7E2D6] p-8 text-center text-xs text-[#6A7B74]">
+              No customer reviews have been submitted.
+            </div>
+          ) : (
+            reviews
+              .slice()
+              .sort((a, b) => Number((b.status ?? 'approved') === 'pending') - Number((a.status ?? 'approved') === 'pending'))
+              .map(review => (
+                <article key={review.id} className="bg-white rounded-2xl border border-[#E7E2D6] p-5 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-sm text-[#17372F]">
+                        {products.find(product => product.id === review.productId)?.name ?? 'Product'}
+                      </h3>
+                      <p className="text-xs text-[#6A7B74] mt-1">
+                        {review.customerName} · {review.customerEmail} · {new Date(review.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                      (review.status ?? 'approved') === 'pending'
+                        ? 'bg-amber-100 text-amber-800'
+                        : review.status === 'rejected'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {review.status ?? 'approved'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#B9944A]">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
+                  <p className="text-sm text-[#4C5E58] whitespace-pre-wrap">{review.comment}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleModerateReview(review, 'approved')}
+                      disabled={(review.status ?? 'approved') === 'approved'}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 disabled:opacity-50 cursor-pointer"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleModerateReview(review, 'rejected')}
+                      disabled={review.status === 'rejected'}
+                      className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold hover:bg-rose-100 disabled:opacity-50 cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </article>
+              ))
+          )}
         </div>
       )}
 
@@ -862,18 +1000,185 @@ export const AdminDashboard: React.FC = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#17372F] mb-1">
+                    Ingredients Transparency
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editingProduct.ingredients?.join('\n') || ''}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      ingredients: e.target.value.split('\n').map(value => value.trim()).filter(Boolean),
+                    })}
+                    placeholder={'One ingredient per line'}
+                    className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#17372F] mb-1">
+                    Key Benefits / Formulation Highlights
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editingProduct.benefits?.join('\n') || ''}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      benefits: e.target.value.split('\n').map(value => value.trim()).filter(Boolean),
+                    })}
+                    placeholder={'One benefit per line'}
+                    className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-[#17372F] mb-1">
-                  Primary Image URL *
+                  Recommended Usage
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={editingProduct.images?.[0] || ''}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, images: [e.target.value] })}
-                  placeholder="/src/assets/images/product_neem_tulsi_soap_1790230421276.jpg"
-                  className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
+                <textarea
+                  rows={2}
+                  value={editingProduct.usage || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, usage: e.target.value })}
+                  placeholder="How customers should use this product"
+                  className="w-full bg-white border border-[#DBD5C5] rounded-xl p-3 text-xs text-[#1E2E2A]"
                 />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17372F]">
+                      Product Gallery Images
+                    </label>
+                    <p className="text-[10px] text-[#7A8A84] mt-0.5">
+                      First image is the main product image; additional images appear in the gallery.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct({
+                      ...editingProduct,
+                      images: [...(editingProduct.images ?? []), ''],
+                    })}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#EAF2EC] text-[#173F35] text-xs font-semibold hover:bg-[#DDECE2] cursor-pointer"
+                  >
+                    + Add image URL
+                  </button>
+                </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setImageDropActive(true);
+                  }}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setImageDropActive(false);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setImageDropActive(false);
+                    void handleProductImageFiles(event.dataTransfer.files);
+                  }}
+                  className={`rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+                    imageDropActive
+                      ? 'border-[#173F35] bg-[#EAF2EC]'
+                      : 'border-[#DBD5C5] bg-white'
+                  }`}
+                >
+                  <UploadCloud className="w-5 h-5 mx-auto text-[#173F35] mb-1" />
+                  <p className="text-xs text-[#52615D]">
+                    {uploadingImages ? 'Uploading images...' : 'Drag and drop product images here'}
+                  </p>
+                  <label className="inline-block mt-1 text-xs font-semibold text-[#173F35] underline cursor-pointer">
+                    or browse files
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                      multiple
+                      disabled={uploadingImages}
+                      onChange={(event) => {
+                        if (event.currentTarget.files) {
+                          void handleProductImageFiles(event.currentTarget.files);
+                          event.currentTarget.value = '';
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                  <p className="text-[10px] text-[#7A8A84] mt-1">JPEG, PNG, WebP, GIF, or AVIF · up to 10 MB each</p>
+                </div>
+                {(editingProduct.images ?? []).length === 0 && (
+                  <p className="text-xs text-[#7A8A84] text-center">
+                    No images added yet. Upload or add an image URL to continue.
+                  </p>
+                )}
+                {(editingProduct.images ?? []).map((image, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-semibold text-[#52615D] mb-1">
+                        {index === 0 ? 'Main image URL' : `Gallery image ${index + 1} URL`}
+                      </label>
+                      <input
+                        type="text"
+                        value={image}
+                        onChange={(e) => {
+                          const images = [...(editingProduct.images ?? [])];
+                          images[index] = e.target.value;
+                          setEditingProduct({ ...editingProduct, images });
+                        }}
+                        placeholder="/src/assets/images/product_image.jpg or https://..."
+                        className="w-full bg-white border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A]"
+                      />
+                    </div>
+                    {index > 0 && image.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct(current => {
+                          if (!current) return current;
+                          const currentImages = [...(current.images ?? [])];
+                          const [selectedImage] = currentImages.splice(index, 1);
+                          currentImages.unshift(selectedImage);
+                          return { ...current, images: currentImages };
+                        })}
+                        aria-label={`Set gallery image ${index + 1} as main image`}
+                        className="mt-5 px-2 py-1.5 text-[10px] text-[#173F35] border border-[#DBD5C5] rounded-lg hover:bg-[#EAF2EC] whitespace-nowrap cursor-pointer"
+                      >
+                        Set as main
+                      </button>
+                    )}
+                    {(editingProduct.images ?? []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct(current => current
+                          ? {
+                            ...current,
+                            images: (current.images ?? []).filter((_, imageIndex) => imageIndex !== index),
+                          }
+                          : current)}
+                        aria-label={`Remove image ${index + 1}`}
+                        className="mt-5 p-2 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {image.trim() && (
+                      <div className="mt-5 relative">
+                        <img
+                          src={resolveProductImage(image.trim())}
+                          alt={`Preview ${index + 1}`}
+                          className="w-10 h-10 rounded-lg object-cover border border-[#E7E2D6] bg-[#F2EEE4]"
+                        />
+                        {index === 0 && (
+                          <span className="absolute -top-1 -right-1 bg-[#173F35] text-white text-[8px] px-1 rounded">
+                            Main
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div className="flex gap-4 pt-2">
@@ -918,9 +1223,10 @@ export const AdminDashboard: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-5 bg-[#173F35] text-white text-xs font-bold rounded-xl hover:bg-[#235D4E] cursor-pointer shadow-sm"
+                  disabled={uploadingImages}
+                  className="py-2 px-5 bg-[#173F35] text-white text-xs font-bold rounded-xl hover:bg-[#235D4E] disabled:opacity-60 cursor-pointer shadow-sm"
                 >
-                  Save Product
+                  {uploadingImages ? 'Uploading Images...' : 'Save Product'}
                 </button>
               </div>
             </form>

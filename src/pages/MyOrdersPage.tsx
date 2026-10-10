@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
+import { resolveProductImage } from '../components/ProductCard';
 import { Order, OrderStatus } from '../types';
 import { Search, Package, CheckCircle, Clock, Truck, Home, AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export const MyOrdersPage: React.FC = () => {
     async function loadOrders() {
       setLoading(true);
       try {
-        const data = await api.getOrders(user?.email);
+        const data = await api.getOrders();
         setOrders(data);
         if (data.length > 0) {
           setExpandedOrderId(data[0].id);
@@ -90,7 +91,7 @@ export const MyOrdersPage: React.FC = () => {
             Order History & Tracking
           </h1>
           <p className="text-xs text-[#6A7B74] mt-0.5">
-            {user ? `Orders for ${user.email}` : 'Track any order using your Order ID'}
+            {user ? `Orders for ${user.email}` : 'Sign in to view and track your orders'}
           </p>
         </div>
 
@@ -257,7 +258,7 @@ export const MyOrdersPage: React.FC = () => {
                           <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
                             <div className="flex items-center gap-3">
                               <img
-                                src={item.image}
+                                src={resolveProductImage(item.image)}
                                 alt=""
                                 className="w-12 h-12 rounded-lg object-cover bg-[#F2EEE4]"
                               />
@@ -354,7 +355,7 @@ export const MyOrdersPage: React.FC = () => {
               <h3 className="font-serif text-lg font-bold">Cancel Order #{cancellingOrder.orderNumber}</h3>
             </div>
             <p className="text-xs text-[#52615D]">
-              Are you sure you want to cancel this order? If you paid online, a full refund will be processed back to your source account.
+              Only pending or confirmed orders can be cancelled. Online payments are not currently verified or refunded automatically.
             </p>
             <div>
               <label className="block text-xs font-semibold text-[#17372F] mb-1">

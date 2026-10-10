@@ -3,6 +3,28 @@ import { Product } from '../types';
 import { useShop } from '../context/ShopContext';
 import { Star, ShoppingBag, Eye, Zap, Sparkles } from 'lucide-react';
 
+const bundledImages = import.meta.glob<string>('../assets/images/*', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+
+export const resolveProductImage = (imagePath: string): string => {
+  const localImagePrefix = '/src/assets/images/';
+  if (!imagePath.startsWith(localImagePrefix)) {
+    return imagePath;
+  }
+
+  const imageFile = imagePath.slice(localImagePrefix.length);
+  console.log(
+    'IMAGE:',
+    imagePath,
+    '→',
+    bundledImages[`../assets/images/${imageFile}`]
+  );
+  return bundledImages[`../assets/images/${imageFile}`] ?? imagePath;
+};
+
 interface ProductCardProps {
   product: Product;
   onQuickView?: (product: Product) => void;
@@ -44,7 +66,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         <div className="relative aspect-[4/3] bg-[#F5F2EB] overflow-hidden">
           {!imageError && product.images && product.images[0] ? (
             <img
-              src={product.images[0]}
+              src={resolveProductImage(product.images[0])}
               alt={product.name}
               referrerPolicy="no-referrer"
               onError={() => setImageError(true)}

@@ -1,386 +1,552 @@
-import fs from 'fs';
-import path from 'path';
 import { User, Product, Category, Order, Review, AdminStats } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_REVIEWS } from '../data/initialData';
 import bcrypt from 'bcryptjs';
+import { getMongoClient, getMongoDB } from './mongodb';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'store.json');
+type StoredUser = User & { passwordHash?: string };
 
-export interface DatabaseSchema {
-  users: User[];
-  products: Product[];
-  categories: Category[];
-  orders: Order[];
-  reviews: Review[];
-  adminPasswordHash: string;
+const EMAIL_COLLATION = { locale: 'en', strength: 2 } as const;
+
+export class InsufficientStockError extends Error {
+  constructor() {
+    super('One or more products are unavailable or have insufficient stock.');
+    this.name = 'InsufficientStockError';
+  }
 }
 
 class Database {
-  private data: DatabaseSchema;
+  // =========================
+  // Users & Auth
+  // =========================
 
-  constructor() {
-    this.data = this.loadData();
+  public async getUsers(): Promise<User[]> {
+    const db = await getMongoDB();
+
+    return db
+      .collection<User>('users')
+      .find({}, { projection: { passwordHash: 0 } })
+      .toArray();
   }
 
-  private loadData(): DatabaseSchema {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
+  public async findUserByEmail(email: string): Promise<StoredUser | undefined> {
+    const db = await getMongoDB();
 
-      if (fs.existsSync(DB_FILE)) {
-        const content = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(content);
-      }
-    } catch (err) {
-      console.warn('Could not read store.json, initializing fresh store:', err);
+    const user = await db.collection<StoredUser>('users').findOne(
+      { email: email.trim().toLowerCase() },
+      { collation: EMAIL_COLLATION }
+    );
+
+    return user ?? undefined;
+  }
+
+  public async findUserById(id: string): Promise<StoredUser | undefined> {
+    const db = await getMongoDB();
+    const user = await db.collection<StoredUser>('users').findOne({ id });
+    return user ?? undefined;
+  }
+
+  public async createUser(user: StoredUser): Promise<User> {
+    const db = await getMongoDB();
+
+    await db.collection<User>('users').insertOne(user);
+
+    return this.toPublicUser(user);
+  }
+
+  public async verifyAdminCredentials(email: string, password: string): Promise<boolean> {
+    const db = await getMongoDB();
+
+    const settings = await db.collection<{
+      _id: string;
+      adminEmail?: string;
+      adminPasswordHash?: string;
+    }>(
+      'settings'
+    ).findOne({ _id: 'admin' });
+
+    if (
+      !settings?.adminEmail ||
+      settings.adminEmail.trim().toLowerCase() !== email.trim().toLowerCase() ||
+      !settings.adminPasswordHash
+    ) {
+      return false;
     }
 
-    // Default seed
-    const defaultData: DatabaseSchema = {
-      users: [
-        {
-          id: 'usr-admin',
-          name: 'VIVE Admin',
-          email: 'admin@vivepanya.com',
-          phone: '+91 98765 43210',
-          role: 'admin',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'usr-customer',
-          name: 'Priya Sundaram',
-          email: 'customer@vivepanya.com',
-          phone: '+91 98450 12345',
-          role: 'customer',
-          createdAt: new Date().toISOString(),
-        }
+    return bcrypt.compare(password, settings.adminPasswordHash);
+  }
+
+  public async isAdminIdentity(id: string, email: string): Promise<boolean> {
+    if (id !== 'admin') return false;
+    const db = await getMongoDB();
+    const settings = await db.collection<{
+      _id: string;
+      adminEmail?: string;
+      adminPasswordHash?: string;
+    }>('settings').findOne({ _id: 'admin' });
+
+    return Boolean(
+      settings?.adminEmail &&
+      settings.adminPasswordHash &&
+      settings.adminEmail.trim().toLowerCase() === email.trim().toLowerCase()
+    );
+  }
+
+  // =========================
+  // Products
+  // =========================
+
+  public async getProducts(): Promise<Product[]> {
+    const db = await getMongoDB();
+    const products = await db
+      .collection<Product>('products')
+      .find({})
+      .toArray();
+    const reviews = await db.collection<Review>('reviews')
+      .find({ $or: [{ status: 'approved' }, { status: { $exists: false } }] })
+      .toArray();
+    const reviewStats = this.getReviewStats(reviews);
+
+    return products.map(product => this.withReviewStats(product, reviewStats.get(product.id)));
+  }
+
+  public async getProductById(id: string): Promise<Product | undefined> {
+    const db = await getMongoDB();
+
+    const product = await db.collection<Product>('products').findOne({
+      $or: [
+        { id },
+        { slug: id },
       ],
-      products: INITIAL_PRODUCTS,
-      categories: INITIAL_CATEGORIES,
-      reviews: INITIAL_REVIEWS,
-      orders: [
-        {
-          id: 'ord-1001',
-          orderNumber: 'VP-2026-1001',
-          customer: {
-            userId: 'usr-customer',
-            name: 'Priya Sundaram',
-            email: 'customer@vivepanya.com',
-            phone: '+91 98450 12345',
-          },
-          deliveryAddress: {
-            name: 'Priya Sundaram',
-            phone: '+91 98450 12345',
-            email: 'customer@vivepanya.com',
-            address: '42 Orchid Residency, 4th Main Road, Indiranagar',
-            city: 'Bengaluru',
-            state: 'Karnataka',
-            pincode: '560038',
-          },
-          items: [
-            {
-              productId: 'prod-1',
-              name: 'Neem & Tulsi Herbal Purifying Soap',
-              price: 149,
-              quantity: 2,
-              image: '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg',
-            },
-            {
-              productId: 'prod-2',
-              name: 'Cold-Pressed Virgin Coconut Oil (500ml)',
-              price: 349,
-              quantity: 1,
-              image: '/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg',
-            },
-          ],
-          subtotal: 647,
-          deliveryCharges: 0,
-          discount: 0,
-          total: 647,
-          paymentMethod: 'Online Payment',
-          paymentStatus: 'Paid',
-          status: 'Delivered',
-          timeline: [
-            { status: 'Pending', timestamp: '2026-03-01T10:00:00Z', note: 'Order placed via Online UPI' },
-            { status: 'Confirmed', timestamp: '2026-03-01T11:30:00Z', note: 'Payment verified and order confirmed' },
-            { status: 'Packed', timestamp: '2026-03-01T15:00:00Z', note: 'Item safely packaged with eco-friendly filler' },
-            { status: 'Shipped', timestamp: '2026-03-02T09:00:00Z', note: 'Dispatched via Blue Dart Express (AWB #8492019)' },
-            { status: 'Out for Delivery', timestamp: '2026-03-03T08:30:00Z', note: 'Courier out for delivery in Indiranagar' },
-            { status: 'Delivered', timestamp: '2026-03-03T14:10:00Z', note: 'Package handed over to recipient' },
-          ],
-          createdAt: '2026-03-01T10:00:00Z',
-          updatedAt: '2026-03-03T14:10:00Z',
-        },
-        {
-          id: 'ord-1002',
-          orderNumber: 'VP-2026-1002',
-          customer: {
-            name: 'Aarav Sharma',
-            email: 'aarav@example.com',
-            phone: '+91 99887 76655',
-          },
-          deliveryAddress: {
-            name: 'Aarav Sharma',
-            phone: '+91 99887 76655',
-            email: 'aarav@example.com',
-            address: 'B-702 Celestial Towers, Bandra West',
-            city: 'Mumbai',
-            state: 'Maharashtra',
-            pincode: '400050',
-          },
-          items: [
-            {
-              productId: 'prod-3',
-              name: 'Artisanal Festival Gift Box Collection',
-              price: 749,
-              quantity: 1,
-              image: '/src/assets/images/product_gift_festival_box_1790230452588.jpg',
-            }
-          ],
-          subtotal: 749,
-          deliveryCharges: 0,
-          discount: 75,
-          total: 674,
-          couponCode: 'VIVE10',
-          paymentMethod: 'Cash on Delivery',
-          paymentStatus: 'Pending',
-          status: 'Shipped',
-          timeline: [
-            { status: 'Pending', timestamp: '2026-03-06T14:20:00Z', note: 'Cash on Delivery order placed' },
-            { status: 'Confirmed', timestamp: '2026-03-06T15:00:00Z', note: 'Customer phone confirmation completed' },
-            { status: 'Packed', timestamp: '2026-03-06T18:00:00Z', note: 'Gift box sealed and boxed' },
-            { status: 'Shipped', timestamp: '2026-03-07T11:00:00Z', note: 'Dispatched via Express Courier' },
-          ],
-          createdAt: '2026-03-06T14:20:00Z',
-          updatedAt: '2026-03-07T11:00:00Z',
-        }
-      ],
-      adminPasswordHash: bcrypt.hashSync('admin123', 8),
-    };
+    });
 
-    this.saveDataToFile(defaultData);
-    return defaultData;
+    if (!product) return undefined;
+
+    const reviews = await db.collection<Review>('reviews')
+      .find({
+        productId: product.id,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .toArray();
+    return this.withReviewStats(product, reviews);
   }
 
-  private saveDataToFile(data: DatabaseSchema) {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Failed to write store.json:', err);
-    }
-  }
+  public async createProduct(product: Product): Promise<Product> {
+    const db = await getMongoDB();
 
-  private save() {
-    this.saveDataToFile(this.data);
-  }
+    await db.collection<Product>('products').insertOne(product);
 
-  // --- Users & Auth ---
-  public getUsers(): User[] {
-    return this.data.users;
-  }
+    await this.updateCategoryCounts();
 
-  public findUserByEmail(email: string): User | undefined {
-    return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  }
-
-  public createUser(user: User): User {
-    this.data.users.push(user);
-    this.save();
-    return user;
-  }
-
-  public verifyAdminPassword(password: string): boolean {
-    return bcrypt.compareSync(password, this.data.adminPasswordHash);
-  }
-
-  // --- Products ---
-  public getProducts(): Product[] {
-    return this.data.products;
-  }
-
-  public getProductById(id: string): Product | undefined {
-    return this.data.products.find(p => p.id === id || p.slug === id);
-  }
-
-  public createProduct(product: Product): Product {
-    this.data.products.unshift(product);
-    this.updateCategoryCounts();
-    this.save();
     return product;
   }
 
-  public updateProduct(id: string, updates: Partial<Product>): Product | null {
-    const idx = this.data.products.findIndex(p => p.id === id);
-    if (idx === -1) return null;
-    this.data.products[idx] = { ...this.data.products[idx], ...updates };
-    this.updateCategoryCounts();
-    this.save();
-    return this.data.products[idx];
-  }
+  public async updateProduct(
+    id: string,
+    updates: Partial<Product>
+  ): Promise<Product | null> {
+    const db = await getMongoDB();
+    const { _id: _mongoId, ...safeUpdates } = updates as Partial<Product> & { _id?: unknown };
 
-  public deleteProduct(id: string): boolean {
-    const initialLen = this.data.products.length;
-    this.data.products = this.data.products.filter(p => p.id !== id);
-    if (this.data.products.length !== initialLen) {
-      this.updateCategoryCounts();
-      this.save();
-      return true;
+    const result = await db.collection<Product>('products').findOneAndUpdate(
+      { id },
+      { $set: safeUpdates },
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return null;
     }
-    return false;
+
+    await this.updateCategoryCounts();
+
+    const reviews = await db.collection<Review>('reviews')
+      .find({
+        productId: result.id,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .toArray();
+    return this.withReviewStats(result, reviews);
   }
 
-  // --- Categories ---
-  public getCategories(): Category[] {
-    this.updateCategoryCounts();
-    return this.data.categories;
+  public async deleteProduct(id: string): Promise<boolean> {
+    const db = await getMongoDB();
+
+    const result = await db.collection<Product>('products').deleteOne({
+      id,
+    });
+
+    if (result.deletedCount === 0) {
+      return false;
+    }
+
+    await this.updateCategoryCounts();
+
+    return true;
   }
 
-  public createCategory(category: Category): Category {
-    this.data.categories.push(category);
-    this.save();
+  // =========================
+  // Categories
+  // =========================
+
+  public async getCategories(): Promise<Category[]> {
+    await this.updateCategoryCounts();
+
+    const db = await getMongoDB();
+
+    return db
+      .collection<Category>('categories')
+      .find({})
+      .toArray();
+  }
+
+  public async createCategory(category: Category): Promise<Category> {
+    const db = await getMongoDB();
+
+    await db.collection<Category>('categories').insertOne(category);
+
     return category;
   }
 
-  private updateCategoryCounts() {
-    this.data.categories = this.data.categories.map(cat => {
-      const count = this.data.products.filter(p => p.category.toLowerCase() === cat.name.toLowerCase()).length;
-      return { ...cat, itemCount: count };
-    });
-  }
+  private async updateCategoryCounts(): Promise<void> {
+    const db = await getMongoDB();
 
-  // --- Orders ---
-  public getOrders(): Order[] {
-    return this.data.orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
+    const products = await db
+      .collection<Product>('products')
+      .find({})
+      .toArray();
 
-  public getOrdersByCustomerEmail(email: string): Order[] {
-    return this.data.orders
-      .filter(o => o.customer.email.toLowerCase() === email.toLowerCase() || o.deliveryAddress.email.toLowerCase() === email.toLowerCase())
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
+    const categories = await db
+      .collection<Category>('categories')
+      .find({})
+      .toArray();
 
-  public getOrderById(id: string): Order | undefined {
-    return this.data.orders.find(o => o.id === id || o.orderNumber.toUpperCase() === id.toUpperCase());
-  }
+    for (const category of categories) {
+      const count = products.filter(
+        product =>
+          product.category.toLowerCase() === category.name.toLowerCase()
+      ).length;
 
-  public createOrder(order: Order): Order {
-    // Reduce stock
-    for (const item of order.items) {
-      const p = this.data.products.find(prod => prod.id === item.productId);
-      if (p) {
-        p.stock = Math.max(0, p.stock - item.quantity);
-      }
+      await db.collection<Category>('categories').updateOne(
+        { id: category.id },
+        {
+          $set: {
+            itemCount: count,
+          },
+        }
+      );
     }
+  }
 
-    // Save order
-    this.data.orders.unshift(order);
+  // =========================
+  // Orders
+  // =========================
 
-    // Auto-record customer if not registered
-    const existingUser = this.findUserByEmail(order.deliveryAddress.email);
-    if (!existingUser) {
-      this.data.users.push({
-        id: `usr-${Date.now()}`,
-        name: order.deliveryAddress.name,
-        email: order.deliveryAddress.email,
-        phone: order.deliveryAddress.phone,
-        role: 'customer',
-        createdAt: new Date().toISOString(),
+  public async getOrders(): Promise<Order[]> {
+    const db = await getMongoDB();
+
+    return db
+      .collection<Order>('orders')
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  public async getOrdersForCustomer(userId: string, email: string): Promise<Order[]> {
+    const db = await getMongoDB();
+    const normalizedEmail = email.trim().toLowerCase();
+    return db.collection<Order>('orders')
+      .find({
+        $or: [
+          { 'customer.userId': userId },
+          { 'customer.email': normalizedEmail },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .collation(EMAIL_COLLATION)
+      .toArray();
+  }
+
+  public async getOrderById(id: string): Promise<Order | undefined> {
+    const db = await getMongoDB();
+
+    const order = await db.collection<Order>('orders').findOne({
+      $or: [
+        { id },
+        { orderNumber: id },
+      ],
+    });
+
+    return order ?? undefined;
+  }
+
+  public async createOrder(order: Order): Promise<Order> {
+    const db = await getMongoDB();
+    const session = getMongoClient().startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        for (const item of order.items) {
+          const result = await db.collection<Product>('products').updateOne(
+            { id: item.productId, stock: { $gte: item.quantity } },
+            { $inc: { stock: -item.quantity } },
+            { session }
+          );
+
+          if (result.matchedCount !== 1) {
+            throw new InsufficientStockError();
+          }
+        }
+
+        await db.collection<Order>('orders').insertOne(order, { session });
       });
+    } finally {
+      await session.endSession();
     }
 
-    this.save();
     return order;
   }
 
-  public updateOrderStatus(id: string, status: Order['status'], note?: string): Order | null {
-    const order = this.data.orders.find(o => o.id === id || o.orderNumber === id);
-    if (!order) return null;
+  public async updateOrderStatus(
+    id: string,
+    status: Order['status'],
+    note?: string
+  ): Promise<Order | null> {
+    const db = await getMongoDB();
 
-    order.status = status;
-    order.updatedAt = new Date().toISOString();
-    order.timeline.push({
+    const order = await this.getOrderById(id);
+
+    if (!order) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+
+    const timelineEntry = {
       status,
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       note: note || `Status updated to ${status}`,
-    });
+    };
 
-    if (status === 'Delivered') {
-      order.paymentStatus = 'Paid';
-    }
+    const update: Record<string, unknown> = {
+      status,
+      updatedAt: now,
+    };
 
-    this.save();
-    return order;
-  }
-
-  public cancelOrder(id: string, reason: string): Order | null {
-    const order = this.data.orders.find(o => o.id === id || o.orderNumber === id);
-    if (!order) return null;
-
-    order.status = 'Cancelled';
-    order.cancellationReason = reason;
-    order.updatedAt = new Date().toISOString();
-    order.timeline.push({
-      status: 'Cancelled',
-      timestamp: new Date().toISOString(),
-      note: `Cancelled: ${reason}`,
-    });
-
-    // Restore stock
-    for (const item of order.items) {
-      const p = this.data.products.find(prod => prod.id === item.productId);
-      if (p) {
-        p.stock += item.quantity;
+    await db.collection<Order>('orders').updateOne(
+      { id: order.id },
+      {
+        $set: update,
+        $push: {
+          timeline: timelineEntry,
+        },
       }
-    }
+    );
 
-    this.save();
-    return order;
+    return this.getOrderById(order.id).then(result => result ?? null);
   }
 
-  // --- Reviews ---
-  public getReviewsForProduct(productId: string): Review[] {
-    return this.data.reviews.filter(r => r.productId === productId);
-  }
+  public async cancelOrder(
+    id: string,
+    reason: string
+  ): Promise<{ order: Order | null; cancelled: boolean }> {
+    const db = await getMongoDB();
+    const session = getMongoClient().startSession();
+    const now = new Date().toISOString();
+    let cancelled = false;
 
-  public addReview(review: Review): Review {
-    this.data.reviews.unshift(review);
+    try {
+      await session.withTransaction(async () => {
+        cancelled = false;
+        const order = await db.collection<Order>('orders').findOne(
+          { $or: [{ id }, { orderNumber: id }] },
+          { session }
+        );
 
-    // Recalculate product rating
-    const prodReviews = this.data.reviews.filter(r => r.productId === review.productId);
-    const avgRating = prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length;
-    const p = this.data.products.find(prod => prod.id === review.productId);
-    if (p) {
-      p.rating = Number(avgRating.toFixed(1));
-      p.reviewCount = prodReviews.length;
+        if (!order || order.status === 'Cancelled') return;
+        if (order.status !== 'Pending' && order.status !== 'Confirmed') return;
+
+        const result = await db.collection<Order>('orders').updateOne(
+          { id: order.id, status: { $in: ['Pending', 'Confirmed'] } },
+          {
+            $set: {
+              status: 'Cancelled',
+              cancellationReason: reason,
+              updatedAt: now,
+            },
+            $push: {
+              timeline: {
+                status: 'Cancelled',
+                timestamp: now,
+                note: `Cancelled: ${reason}`,
+              },
+            },
+          },
+          { session }
+        );
+
+        if (result.modifiedCount !== 1) return;
+
+        for (const item of order.items) {
+          await db.collection<Product>('products').updateOne(
+            { id: item.productId },
+            { $inc: { stock: item.quantity } },
+            { session }
+          );
+        }
+        cancelled = true;
+      });
+    } finally {
+      await session.endSession();
     }
 
-    this.save();
+    return { order: await this.getOrderById(id) ?? null, cancelled };
+  }
+
+  public async hasVerifiedPurchase(userId: string, email: string, productId: string): Promise<boolean> {
+    const db = await getMongoDB();
+    const order = await db.collection<Order>('orders').findOne({
+      status: 'Delivered',
+      'items.productId': productId,
+      $or: [
+        { 'customer.userId': userId },
+        { 'customer.email': email.trim().toLowerCase() },
+      ],
+    }, { collation: EMAIL_COLLATION });
+    return Boolean(order);
+  }
+
+  // =========================
+  // Reviews
+  // =========================
+
+  public async getReviewsForProduct(
+    productId: string
+  ): Promise<Review[]> {
+    const db = await getMongoDB();
+
+    return db
+      .collection<Review>('reviews')
+      .find({
+        productId,
+        $or: [{ status: 'approved' }, { status: { $exists: false } }],
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  public async getReviewsForAdmin(): Promise<Review[]> {
+    const db = await getMongoDB();
+
+    return db.collection<Review>('reviews')
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  public async addReview(review: Review): Promise<Review> {
+    const db = await getMongoDB();
+
+    await db.collection<Review>('reviews').insertOne(review);
+
     return review;
   }
 
-  // --- Admin Stats ---
-  public getStats(): AdminStats {
-    const totalSales = this.data.orders
-      .filter(o => o.status !== 'Cancelled')
-      .reduce((sum, o) => sum + o.total, 0);
+  public async moderateReview(
+    id: string,
+    status: 'approved' | 'rejected'
+  ): Promise<Review | null> {
+    const db = await getMongoDB();
+    const review = await db.collection<Review>('reviews').findOneAndUpdate(
+      { id },
+      { $set: { status } },
+      { returnDocument: 'after' }
+    );
 
-    const pendingOrders = this.data.orders.filter(o => o.status === 'Pending').length;
-    const deliveredOrders = this.data.orders.filter(o => o.status === 'Delivered').length;
-    const lowStockProducts = this.data.products.filter(p => p.stock <= 20).length;
+    return review;
+  }
+
+  private getReviewStats(reviews: Review[]): Map<string, Review[]> {
+    const stats = new Map<string, Review[]>();
+    for (const review of reviews) {
+      const productReviews = stats.get(review.productId) ?? [];
+      productReviews.push(review);
+      stats.set(review.productId, productReviews);
+    }
+    return stats;
+  }
+
+  private withReviewStats(
+    product: Product,
+    reviews: Review[] | undefined
+  ): Product {
+    const approvedReviews = reviews ?? [];
+    const rating = approvedReviews.length
+      ? approvedReviews.reduce((total, review) => total + review.rating, 0) / approvedReviews.length
+      : 0;
 
     return {
-      totalProducts: this.data.products.length,
-      totalOrders: this.data.orders.length,
-      totalCustomers: this.data.users.filter(u => u.role === 'customer').length,
+      ...product,
+      rating: Number(rating.toFixed(1)),
+      reviewCount: approvedReviews.length,
+    };
+  }
+
+  // =========================
+  // Admin Stats
+  // =========================
+
+  public async getStats(): Promise<AdminStats> {
+    const db = await getMongoDB();
+
+    const orders = await db
+      .collection<Order>('orders')
+      .find({})
+      .toArray();
+
+    const products = await db
+      .collection<Product>('products')
+      .find({})
+      .toArray();
+
+    const users = await db
+      .collection<User>('users')
+      .find({})
+      .toArray();
+
+    const totalSales = orders
+      .filter(order => order.paymentStatus === 'Paid' && order.status !== 'Cancelled')
+      .reduce((sum, order) => sum + order.total, 0);
+
+    const pendingOrders = orders.filter(
+      order => order.status === 'Pending'
+    ).length;
+
+    const deliveredOrders = orders.filter(
+      order => order.status === 'Delivered'
+    ).length;
+
+    const lowStockProducts = products.filter(
+      product => product.stock <= 20
+    ).length;
+
+    return {
+      totalProducts: products.length,
+      totalOrders: orders.length,
+      totalCustomers: users.filter(user => user.role === 'customer').length,
       totalSales,
       pendingOrders,
       deliveredOrders,
       lowStockProducts,
+    };
+  }
+
+  private toPublicUser(user: StoredUser): User {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.createdAt,
     };
   }
 }

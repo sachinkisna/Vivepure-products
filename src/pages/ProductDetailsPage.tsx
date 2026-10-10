@@ -3,6 +3,7 @@ import { useShop } from '../context/ShopContext';
 import { api } from '../services/api';
 import { Product, Review } from '../types';
 import { ProductCard } from '../components/ProductCard';
+import { resolveProductImage } from '../components/ProductCard';
 import { Star, ShoppingBag, Zap, Check, ArrowLeft, ShieldCheck, Truck, RefreshCw, Send, User } from 'lucide-react';
 
 export const ProductDetailsPage: React.FC = () => {
@@ -18,8 +19,6 @@ export const ProductDetailsPage: React.FC = () => {
 
   // Review submission state
   const [reviewRating, setReviewRating] = useState(5);
-  const [reviewName, setReviewName] = useState(user?.name || '');
-  const [reviewEmail, setReviewEmail] = useState(user?.email || '');
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
@@ -72,22 +71,23 @@ export const ProductDetailsPage: React.FC = () => {
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewComment.trim()) return;
+    if (!user || user.role !== 'customer') {
+      showToast('Sign in with a customer account to submit a review.');
+      return;
+    }
 
     setSubmittingReview(true);
     try {
-      const newReview = await api.addReview({
+      await api.addReview({
         productId: product.id,
-        customerName: reviewName || 'Anonymous Customer',
-        customerEmail: reviewEmail,
         rating: reviewRating,
         comment: reviewComment,
       });
 
-      setReviews(prev => [newReview, ...prev]);
       setReviewComment('');
-      showToast('Thank you! Your verified review has been submitted.');
+      showToast('Thank you! Your review is pending approval.');
     } catch (err) {
-      showToast('Failed to submit review');
+      showToast(err instanceof Error ? err.message : 'Failed to submit review');
     } finally {
       setSubmittingReview(false);
     }
@@ -117,7 +117,7 @@ export const ProductDetailsPage: React.FC = () => {
         <div className="lg:col-span-6 space-y-4">
           <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-[#F2EEE4] border border-[#E7E2D6] shadow-sm">
             <img
-              src={product.images[activeImageIndex] || product.images[0]}
+              src={resolveProductImage(product.images[activeImageIndex] || product.images[0])}
               alt={product.name}
               className="w-full h-full object-cover"
             />
@@ -133,7 +133,7 @@ export const ProductDetailsPage: React.FC = () => {
                     activeImageIndex === idx ? 'border-[#173F35] shadow-sm' : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={resolveProductImage(img)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -278,9 +278,9 @@ export const ProductDetailsPage: React.FC = () => {
           </div>
 
           {/* Quick bullet benefits */}
-          {product.benefits && product.benefits.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#17372F]">Formulation Highlights</p>
+          <div className="space-y-2 pt-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#17372F]">Formulation Highlights</p>
+            {product.benefits && product.benefits.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {product.benefits.map((b, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-[#4C5E58]">
@@ -289,8 +289,10 @@ export const ProductDetailsPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-[#6A7B74]">Product highlights will be added soon.</p>
+            )}
+          </div>
 
         </div>
       </div>
@@ -377,12 +379,14 @@ export const ProductDetailsPage: React.FC = () => {
 
           {activeTab === 'benefits' && (
             <div className="max-w-2xl space-y-3">
-              {product.benefits?.map((b, i) => (
-                <div key={i} className="flex items-start gap-2.5 p-3 bg-white rounded-xl border border-[#E7E2D6] text-xs sm:text-sm text-[#4C5E58]">
-                  <Check className="w-4 h-4 text-[#173F35] shrink-0 mt-0.5" />
-                  <span>{b}</span>
-                </div>
-              ))}
+              {product.benefits && product.benefits.length > 0 ? product.benefits.map((b, i) => (
+                  <div key={i} className="flex items-start gap-2.5 p-3 bg-white rounded-xl border border-[#E7E2D6] text-xs sm:text-sm text-[#4C5E58]">
+                    <Check className="w-4 h-4 text-[#173F35] shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </div>
+                )) : (
+                  <p className="text-xs text-[#6A7B74]">Product benefits will be added soon.</p>
+                )}
             </div>
           )}
 
@@ -391,9 +395,15 @@ export const ProductDetailsPage: React.FC = () => {
               {/* Write Review Form */}
               <div className="bg-white p-6 rounded-2xl border border-[#E7E2D6] max-w-2xl">
                 <h3 className="font-serif text-lg font-bold text-[#17372F] mb-1">Write a Review</h3>
-                <p className="text-xs text-[#6A7B74] mb-4">Share your personal experience with this product.</p>
+                {!user || user.role !== 'customer' ? (
+                  <p className="text-xs text-[#6A7B74]">
+                    Sign in with a customer account to share your experience. Reviews are published after approval.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs text-[#6A7B74] mb-4">Signed in as {user.name}. Your review will be published after approval.</p>
 
-                <form onSubmit={handleSubmitReview} className="space-y-4">
+                    <form onSubmit={handleSubmitReview} className="space-y-4">
                   {/* Rating Selector */}
                   <div>
                     <label className="block text-xs font-semibold text-[#17372F] mb-1">Your Rating</label>
@@ -417,30 +427,6 @@ export const ProductDetailsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#17372F] mb-1">Your Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={reviewName}
-                        onChange={(e) => setReviewName(e.target.value)}
-                        placeholder="e.g. Priya S."
-                        className="w-full bg-[#FAF8F5] border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A] focus:outline-none focus:border-[#173F35]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#17372F] mb-1">Your Email</label>
-                      <input
-                        type="email"
-                        value={reviewEmail}
-                        onChange={(e) => setReviewEmail(e.target.value)}
-                        placeholder="name@example.com"
-                        className="w-full bg-[#FAF8F5] border border-[#DBD5C5] rounded-xl py-2 px-3 text-xs text-[#1E2E2A] focus:outline-none focus:border-[#173F35]"
-                      />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-xs font-semibold text-[#17372F] mb-1">Your Review</label>
                     <textarea
@@ -461,7 +447,9 @@ export const ProductDetailsPage: React.FC = () => {
                     <Send className="w-3.5 h-3.5" />
                     <span>{submittingReview ? 'Posting...' : 'Submit Review'}</span>
                   </button>
-                </form>
+                    </form>
+                  </>
+                )}
               </div>
 
               {/* Reviews List */}

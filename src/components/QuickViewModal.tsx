@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useShop } from '../context/ShopContext';
+import { resolveProductImage } from './ProductCard';
 import { X, Star, ShoppingBag, Zap, Check, ArrowRight } from 'lucide-react';
 
 interface QuickViewModalProps {
@@ -52,8 +53,9 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
         <div className="md:w-1/2 bg-[#F2EEE4] p-6 flex flex-col justify-between">
           <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-white shadow-inner">
             <img
-              src={product.images[activeImageIndex] || product.images[0]}
+              src={resolveProductImage(product.images[activeImageIndex] || product.images[0])}
               alt={product.name}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
             />
           </div>
@@ -68,7 +70,12 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
                     activeImageIndex === idx ? 'border-[#173F35] scale-105' : 'border-transparent opacity-70'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={resolveProductImage(img)}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>

@@ -3,14 +3,20 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build",
-    "preview": "vite preview",
-    "start": "node server.ts",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+  "engines": {
+    "node": "22.x",
+    "npm": ">=10"
   },
+  "scripts": {
+  "dev": "tsx server.ts",
+  "configure:admin": "tsx scripts/configure-admin.ts",
+  "build": "vite build && npm run build:server",
+  "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server-dist/server.js",
+  "preview": "vite preview",
+  "start": "node server-dist/server.js",
+  "clean": "rm -rf dist server-dist",
+  "lint": "tsc --noEmit"
+},
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
@@ -20,6 +26,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
+    "mongodb": "^7.7.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -33,7 +40,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"

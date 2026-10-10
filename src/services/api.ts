@@ -1,26 +1,27 @@
-import { Product, Category, Order, Review, User, AdminStats } from '../types';
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES, INITIAL_REVIEWS } from '../data/initialData';
+import {
+  Product,
+  Category,
+  Order,
+  Review,
+  User,
+  AdminStats,
+  CreateOrderRequest,
+  CustomerSummary,
+} from '../types';
+import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from '../data/initialData';
 
 const TOKEN_KEY = 'vivepanya_token';
-const USER_KEY = 'vivepanya_user';
 
 export const getStoredToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
 };
 
-export const getStoredUser = (): User | null => {
-  const data = localStorage.getItem(USER_KEY);
-  return data ? JSON.parse(data) : null;
-};
-
-export const saveAuthSession = (token: string, user: User) => {
+export const saveAuthSession = (token: string) => {
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 export const clearAuthSession = () => {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
 };
 
 // Common fetch helper with authorization headers
@@ -42,6 +43,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     });
 
     if (!res.ok) {
+      if (
+        res.status === 401 &&
+        token &&
+        endpoint !== '/api/auth/login' &&
+        endpoint !== '/api/auth/register'
+      ) {
+        clearAuthSession();
+        window.dispatchEvent(new Event('auth:expired'));
+      }
       const errData = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(errData.error || `HTTP error ${res.status}`);
     }
@@ -63,29 +73,69 @@ export const api = {
     minRating?: number;
     sort?: string;
   }): Promise<Product[]> {
-    try {
-      const query = new URLSearchParams();
-      if (params?.search) query.set('search', params.search);
-      if (params?.category && params.category !== 'All') query.set('category', params.category);
-      if (params?.minPrice !== undefined) query.set('minPrice', params.minPrice.toString());
-      if (params?.maxPrice !== undefined) query.set('maxPrice', params.maxPrice.toString());
-      if (params?.minRating) query.set('minRating', params.minRating.toString());
-      if (params?.sort) query.set('sort', params.sort);
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.category && params.category !== 'All') query.set('category', params.category);
+    if (params?.minPrice !== undefined) query.set('minPrice', params.minPrice.toString());
+    if (params?.maxPrice !== undefined) query.set('maxPrice', params.maxPrice.toString());
+    if (params?.minRating) query.set('minRating', params.minRating.toString());
+    if (params?.sort) query.set('sort', params.sort);
 
+    let list: Product[];
+    try {
       const qs = query.toString();
-      return await request<Product[]>(`/api/products${qs ? `?${qs}` : ''}`);
+      const products = await request<Product[]>(`/api/products${qs ? `?${qs}` : ''}`);
+      if (products.length > 0) {
+        return products;
+      }
+
+      if (qs) {
+        const storedProducts = await request<Product[]>('/api/products');
+        if (storedProducts.length > 0) {
+          return products;
+        }
+      }
+
+      list = [...INITIAL_PRODUCTS];
     } catch {
-      // Graceful fallback to initial products
-      let list = [...INITIAL_PRODUCTS];
-      if (params?.search) {
-        const q = params.search.toLowerCase();
-        list = list.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-      }
-      if (params?.category && params.category !== 'All') {
-        list = list.filter(p => p.category.toLowerCase() === params.category!.toLowerCase());
-      }
-      return list;
+      list = [...INITIAL_PRODUCTS];
     }
+
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      list = list.filter(
+        p =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
+    if (params?.category && params.category !== 'All') {
+      list = list.filter(p => p.category.toLowerCase() === params.category!.toLowerCase());
+    }
+    if (params?.minPrice !== undefined) {
+      list = list.filter(p => (p.discountPrice || p.price) >= params.minPrice!);
+    }
+    if (params?.maxPrice !== undefined) {
+      list = list.filter(p => (p.discountPrice || p.price) <= params.maxPrice!);
+    }
+    if (params?.minRating) {
+      list = list.filter(p => p.rating >= params.minRating!);
+    }
+
+    if (params?.sort === 'price-low') {
+      list.sort((a, b) => (a.discountPrice || a.price) - (b.discountPrice || b.price));
+    } else if (params?.sort === 'price-high') {
+      list.sort((a, b) => (b.discountPrice || b.price) - (a.discountPrice || a.price));
+    } else if (params?.sort === 'rating') {
+      list.sort((a, b) => b.rating - a.rating);
+    } else if (params?.sort === 'newest') {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      list.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+    }
+
+    return list;
   },
 
   async getProductById(id: string): Promise<Product> {
@@ -112,6 +162,39 @@ export const api = {
     });
   },
 
+  async uploadProductImage(file: File): Promise<{ url: string; name: string }> {
+    const token = getStoredToken();
+    if (!token) {
+      throw new Error('Sign in as an administrator to upload product images.');
+    }
+
+    const response = await fetch('/api/admin/product-images', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': file.type,
+        'X-File-Name': encodeURIComponent(file.name),
+      },
+      body: file,
+    });
+
+    if (response.status === 401) {
+      clearAuthSession();
+      window.dispatchEvent(new Event('auth:expired'));
+    }
+
+    const result = await response.json().catch(() => ({})) as {
+      url?: string;
+      name?: string;
+      error?: string;
+    };
+    if (!response.ok || !result.url || !result.name) {
+      throw new Error(result.error || `Image upload failed (HTTP ${response.status}).`);
+    }
+
+    return { url: result.url, name: result.name };
+  },
+
   async deleteProduct(id: string): Promise<{ success: boolean }> {
     return await request<{ success: boolean }>(`/api/products/${id}`, {
       method: 'DELETE',
@@ -135,19 +218,15 @@ export const api = {
   },
 
   // --- Orders ---
-  async createOrder(orderData: any): Promise<Order> {
+  async createOrder(orderData: CreateOrderRequest): Promise<Order> {
     return await request<Order>('/api/orders', {
       method: 'POST',
       body: JSON.stringify(orderData),
     });
   },
 
-  async getOrders(email?: string, isAdmin?: boolean): Promise<Order[]> {
-    const query = new URLSearchParams();
-    if (email) query.set('email', email);
-    if (isAdmin) query.set('admin', 'true');
-    const qs = query.toString();
-    return await request<Order[]>(`/api/orders${qs ? `?${qs}` : ''}`);
+  async getOrders(): Promise<Order[]> {
+    return await request<Order[]>('/api/orders');
   },
 
   async getOrderById(id: string): Promise<Order> {
@@ -170,17 +249,22 @@ export const api = {
 
   // --- Reviews ---
   async getReviews(productId: string): Promise<Review[]> {
-    try {
-      return await request<Review[]>(`/api/reviews/${productId}`);
-    } catch {
-      return INITIAL_REVIEWS.filter(r => r.productId === productId);
-    }
+    return await request<Review[]>(`/api/reviews/${productId}`);
+  },
+
+  async getAdminReviews(): Promise<Review[]> {
+    return await request<Review[]>('/api/admin/reviews');
+  },
+
+  async moderateReview(id: string, status: 'approved' | 'rejected'): Promise<Review> {
+    return await request<Review>(`/api/admin/reviews/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
   },
 
   async addReview(reviewData: {
     productId: string;
-    customerName: string;
-    customerEmail?: string;
     rating: number;
     comment: string;
   }): Promise<Review> {
@@ -196,8 +280,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    saveAuthSession(res.token, res.user);
+    saveAuthSession(res.token);
     return res;
+  },
+
+  async getCurrentUser(): Promise<User> {
+    const result = await request<{ user: User }>('/api/auth/me');
+    return result.user;
   },
 
   async register(name: string, email: string, password: string, phone?: string): Promise<{ user: User; token: string }> {
@@ -205,7 +294,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, email, password, phone }),
     });
-    saveAuthSession(res.token, res.user);
+    saveAuthSession(res.token);
     return res;
   },
 
@@ -214,7 +303,7 @@ export const api = {
     return await request<AdminStats>('/api/admin/stats');
   },
 
-  async getCustomers(): Promise<any[]> {
-    return await request<any[]>('/api/admin/customers');
+  async getCustomers(): Promise<CustomerSummary[]> {
+    return await request<CustomerSummary[]>('/api/admin/customers');
   },
 };

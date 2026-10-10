@@ -101,6 +101,19 @@ export interface Order {
   cancellationReason?: string;
 }
 
+export interface CreateOrderRequest {
+  deliveryAddress: DeliveryAddress;
+  items: Array<Pick<OrderItem, 'productId' | 'quantity'>>;
+  couponCode?: string;
+  paymentMethod: Order['paymentMethod'];
+}
+
+export interface CustomerSummary extends User {
+  orderCount: number;
+  totalSpent: number;
+  lastOrderDate?: string;
+}
+
 export interface Review {
   id: string;
   productId: string;
@@ -110,6 +123,7 @@ export interface Review {
   comment: string;
   verifiedPurchase: boolean;
   createdAt: string;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface AdminStats {

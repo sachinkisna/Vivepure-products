@@ -1,3 +1,4 @@
+import { resolveProductImage } from '../components/ProductCard';
 import React, { useState, useEffect } from 'react';
 import { ProductCard } from '../components/ProductCard';
 import { QuickViewModal } from '../components/QuickViewModal';
@@ -7,7 +8,7 @@ import { Product, Category } from '../types';
 import { Sparkles, ArrowRight, ShieldCheck, HeartHandshake, Leaf, Star, CheckCircle, Package } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
-  const { setActivePage, setSelectedCategory, addToCart } = useShop();
+  const { setActivePage, setSelectedCategory, setSelectedProductId, addToCart } = useShop();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,24 +122,33 @@ export const HomePage: React.FC = () => {
             <div className="lg:col-span-6">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/80 aspect-[16/9] lg:aspect-[4/3] bg-[#EAE5D8]">
                 <img
-                  src="/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg"
-                  alt="VIVEPANYA Handcrafted Soaps and Virgin Coconut Oil"
+                  src="https://ik.imagekit.io/aiodifydotcom/vivepanya/products/VivePure_Anti-Tan_Herbal_Soap_XPp41O76t.png"
+                  alt="VivePure Anti-Tan Herbal Soap – Natural Skin Cleansing & Tan Care"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl bg-white/90 backdrop-blur-md border border-white/40 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#173F35]">Signature Collection</span>
-                    <h3 className="font-serif text-sm font-bold text-[#17372F]">Virgin Coconut Oil & Artisan Soaps</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#173F35]">Featured Herbal Care</span>
+                    <h3 className="font-serif text-sm font-bold text-[#17372F]">VivePure Anti-Tan Herbal Soap</h3>
                   </div>
                   <button
                     onClick={() => {
-                      setSelectedCategory('All');
-                      setActivePage('shop');
+                      const product = products.find(item =>
+                        item.name.toLowerCase().includes('vivepure anti-tan herbal soap') ||
+                        item.name.toLowerCase().includes('vivepure anti tan herbal soap')
+                      );
+                      if (product) {
+                        setSelectedProductId(product.id);
+                        setActivePage('product-details');
+                      } else {
+                        setSelectedCategory('Special Care & Detox');
+                        setActivePage('shop');
+                      }
                     }}
                     className="py-1.5 px-3 bg-[#173F35] text-white text-xs font-semibold rounded-lg hover:bg-[#235D4E] cursor-pointer"
                   >
-                    View
+                    Explore
                   </button>
                 </div>
               </div>
@@ -180,7 +190,7 @@ export const HomePage: React.FC = () => {
             >
               <div className="relative aspect-[4/3] bg-[#EFECE3] overflow-hidden">
                 <img
-                  src={cat.image}
+                  src={resolveProductImage(cat.image)}
                   alt={cat.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -295,7 +305,7 @@ export const HomePage: React.FC = () => {
 
           <div className="lg:col-span-5 bg-[#1F4E42] relative min-h-[300px]">
             <img
-              src="/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg"
+              src={resolveProductImage('/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg')}
               alt="Cold-Pressed Virgin Coconut Oil"
               className="w-full h-full object-cover"
             />

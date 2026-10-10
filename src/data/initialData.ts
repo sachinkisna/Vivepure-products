@@ -65,7 +65,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg'
     ],
     rating: 4.8,
-    reviewCount: 38,
+    reviewCount: 1,
     isFeatured: true,
     isBestSeller: true,
     isNewArrival: false,
@@ -96,7 +96,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg'
     ],
     rating: 4.9,
-    reviewCount: 64,
+    reviewCount: 1,
     isFeatured: true,
     isBestSeller: true,
     isNewArrival: false,
@@ -130,7 +130,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/hero_handcrafted_skincare_1790230406036.jpg'
     ],
     rating: 5.0,
-    reviewCount: 19,
+    reviewCount: 1,
     isFeatured: true,
     isBestSeller: false,
     isNewArrival: true,
@@ -162,7 +162,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'
     ],
     rating: 4.7,
-    reviewCount: 29,
+    reviewCount: 0,
     isFeatured: false,
     isBestSeller: true,
     isNewArrival: false,
@@ -194,7 +194,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'
     ],
     rating: 4.8,
-    reviewCount: 42,
+    reviewCount: 1,
     isFeatured: true,
     isBestSeller: true,
     isNewArrival: false,
@@ -226,7 +226,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'
     ],
     rating: 4.6,
-    reviewCount: 22,
+    reviewCount: 0,
     isFeatured: false,
     isBestSeller: false,
     isNewArrival: true,
@@ -258,7 +258,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_neem_tulsi_soap_1790230422423.jpg'
     ],
     rating: 4.9,
-    reviewCount: 51,
+    reviewCount: 0,
     isFeatured: true,
     isBestSeller: true,
     isNewArrival: false,
@@ -287,7 +287,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_virgin_coconut_oil_1790230435872.jpg'
     ],
     rating: 4.8,
-    reviewCount: 31,
+    reviewCount: 0,
     isFeatured: false,
     isBestSeller: false,
     isNewArrival: false,
@@ -317,7 +317,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       '/src/assets/images/product_gift_festival_box_1790230452588.jpg'
     ],
     rating: 4.9,
-    reviewCount: 37,
+    reviewCount: 0,
     isFeatured: false,
     isBestSeller: true,
     isNewArrival: true,
